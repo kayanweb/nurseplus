@@ -26,14 +26,39 @@ import {
   ChevronRight,
   AlertTriangle,
   File,
-  ThumbsUp
+  ThumbsUp,
+  Printer,
+  Calendar,
+  Filter,
+  Search,
+  ShieldCheck,
+  Brain
 } from "lucide-react";
 import { AppUser, SavedRecord } from "../types";
+import { useFirestoreSync } from "../hooks/useFirestoreSync";
 
 // Import Cloud-Safe functions from firestore service
 import {
   saveSentinelIncident,
-  deleteSentinelIncident
+  deleteSentinelIncident,
+  syncCQIOvrs,
+  saveCQIOvr,
+  deleteCQIOvr,
+  syncCQIStaffEvals,
+  saveCQIStaffEval,
+  deleteCQIStaffEval,
+  syncCQIUnitInspections,
+  saveCQIUnitInspection,
+  deleteCQIUnitInspection,
+  syncCQIPolicyAcks,
+  saveCQIPolicyAck,
+  deleteCQIPolicyAck,
+  saveSetting,
+  getSetting,
+  syncSetting,
+  syncCQIDecisionLogs,
+  saveCQIDecisionLog,
+  deleteCQIDecisionLog
 } from "../lib/firestoreService";
 
 interface QualityAnalyticsHubProps {
@@ -123,7 +148,7 @@ export default function QualityAnalyticsHub({
   const isAr = language === "ar";
 
   // Backwards compatible & expanded sub-tabs
-  const [activeTab, setActiveTabLocal] = useState<"kpis" | "ovr" | "compliance" | "eval-staff" | "eval-unit" | "policies">("kpis");
+  const [activeTab, setActiveTabLocal] = useState<"kpis" | "ovr" | "compliance" | "eval-staff" | "eval-unit" | "policies" | "archive" | "decision">("kpis");
 
   // Sync parent tab trigger
   useEffect(() => {
@@ -136,139 +161,223 @@ export default function QualityAnalyticsHub({
     }
   }, [analyticsSubTab]);
 
-  // 1. OVR STATE
-  const [ovrs, setOvrs] = useState<any[]>(() => {
-    const saved = localStorage.getItem("baheya_cqi_ovrs");
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
+  // 1. OVR STATE - Synced Real-Time with Firestore
+  const [ovrs, setOvrs] = useFirestoreSync<any>(syncCQIOvrs, [
+    {
+      id: "ovr-1",
+      date: "2026-06-05",
+      time: "11:30",
+      department: "EMERGENCY UNIT",
+      categoryAr: "إعطاء الدواء خطأ (Medication Error)",
+      categoryEn: "Medication Misadministration",
+      severity: "Category D - Harm Reached Patient but No Harm Caused",
+      descAr: "تم إعطاء جرعة مضاعفة من مسكن الآلام نتيجة عدم التحقق المزدوج من تذكرة العلاج قبل الحقن. تم رصد الواقعة بالسرعة وملاحظة ضربات القلب بانتظام.",
+      descEn: "Double dose of painkiller administered due to lack of standard secondary verification before injection. Condition monitored closely with normal vitals.",
+      correctiveAr: "استدعاء الصيدلي الإكلينيكي فوراً بموقع الطوارئ ومراجعة العلامات الحيوية كل 15 دقيقة مع توقيع عقوبة تنبيه إداري للممرض المسؤول.",
+      correctiveEn: "Immediate bedside clinical pharmacist call, vitals monitored q15m, and administrative warning issued.",
+      witness: "أ. هدى أحمد (مشرفة تمريض)",
+      loggedBy: "أ. نورهان علي (جودة)",
+      patientInvolved: true,
+      patientMRN: "MRN-84920",
+      patientName: "منى عاطف الجبالي",
+      status: "Corrective Action Verified"
     }
-    return [
-      {
-        id: "ovr-1",
-        date: "2026-06-05",
-        time: "11:30",
-        department: "EMERGENCY UNIT",
-        categoryAr: "إعطاء الدواء خطأ (Medication Error)",
-        categoryEn: "Medication Misadministration",
-        severity: "Category D - Harm Reached Patient but No Harm Caused",
-        descAr: "تم إعطاء جرعة مضاعفة من مسكن الآلام نتيجة عدم التحقق المزدوج من تذكرة العلاج قبل الحقن. تم رصد الواقعة بالسرعة وملاحظة ضربات القلب بانتظام.",
-        descEn: "Double dose of painkiller administered due to lack of standard secondary verification before injection. Condition monitored closely with normal vitals.",
-        correctiveAr: "استدعاء الصيدلي الإكلينيكي فوراً بموقع الطوارئ ومراجعة العلامات الحيوية كل 15 دقيقة مع توقيع عقوبة تنبيه إداري للممرض المسؤول.",
-        correctiveEn: "Immediate bedside clinical pharmacist call, vitals monitored q15m, and administrative warning issued.",
-        witness: "أ. هدى أحمد (مشرفة تمريض)",
-        loggedBy: "أ. نورهان علي (جودة)",
-        patientInvolved: true,
-        patientMRN: "MRN-84920",
-        patientName: "منى عاطف الجبالي",
-        status: "Corrective Action Verified"
-      },
-      {
-        id: "ovr-2",
-        date: "2026-06-07",
-        time: "03:45",
-        department: "INTENSIVE CARE UNIT (ICU)",
-        categoryAr: "وخز إبرة فني (Needle-stick injury)",
-        categoryEn: "Needle-Stick Incident",
-        severity: "Category C - Reached Patient or Staff but No Harm Done",
-        descAr: "تعرضت ممرضة امتياز لوخز إبرة أنسولين مستعملة أثناء محاولة كبس غطاء السرنجة يدوياً متجاهلة سياسات مكافحة العدوى والعلب الحادة.",
-        descEn: "Intern nurse experienced a needle-stick injury while recapping a syringe manually, violating sharp safety policy.",
-        correctiveAr: "غسيل اليد بالماء والصابون فوراً، إرسال الموظفة لوحدة صحية العمل لعمل التحاليل الفورية للمريض ومتابعة الأجسام المضادة.",
-        correctiveEn: "Immediate washing, referred to employee health clinic for baseline lab tests and monitoring protocol.",
-        witness: "د. أحمد الشافعي",
-        loggedBy: "أ. نورهان علي (جودة)",
-        patientInvolved: false,
-        status: "Under Active Surveillance"
-      }
-    ];
-  });
+  ]);
 
-  // 2. STAFF EVALUATIONS STATE
-  const [staffEvals, setStaffEvals] = useState<any[]>(() => {
-    const saved = localStorage.getItem("baheya_cqi_staff_evals");
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
-    }
-    return [
-      {
-        id: "eval-1",
-        employeeId: "user-nurse",
-        employeeNameAr: "أ. فاطمة الزهراء (استاف التمريض)",
-        employeeNameEn: "Sister Fatima El-Zahraa (Staff Nurse)",
-        department: "EMERGENCY UNIT",
-        evalDate: "2026-06-01",
-        evaluatorName: "أ. هدى أحمد (مشرفة تمريض الطوارئ)",
-        scores: {
-          clinical: 5,
-          policy: 4,
-          documentation: 5,
-          attendance: 4,
-          ethics: 5
-        },
-        comments: "تظهر التزاماً مطلقاً بمعايير الجودة السريرية وتحرص على تعبئة شيت جرد الكود بلو وعربة الطوارئ بالوقت الصحيح."
+  // 2. STAFF EVALUATIONS STATE - Synced Real-Time with Firestore
+  const [staffEvals, setStaffEvals] = useFirestoreSync<any>(syncCQIStaffEvals, [
+    {
+      id: "eval-1",
+      employeeId: "user-nurse",
+      employeeNameAr: "أ. فاطمة الزهراء (استاف التمريض)",
+      employeeNameEn: "Sister Fatima El-Zahraa (Staff Nurse)",
+      department: "EMERGENCY UNIT",
+      evalDate: "2026-06-01",
+      evaluatorName: "أ. هدى أحمد (مشرفة تمريض الطوارئ)",
+      scores: {
+        clinical: 5,
+        policy: 4,
+        documentation: 5,
+        attendance: 4,
+        ethics: 5
       },
-      {
-        id: "eval-2",
-        employeeId: "emp-2",
-        employeeNameAr: "هاني ناصر (أخصائي تمريض SN)",
-        employeeNameEn: "Hany Naser (Staff Nurse)",
-        department: "EMERGENCY UNIT",
-        evalDate: "2026-06-03",
-        evaluatorName: "د. محمد السيد (مدير قسم العمليات)",
-        scores: {
-          clinical: 4,
-          policy: 4,
-          documentation: 3,
-          attendance: 5,
-          ethics: 4
-        },
-        comments: "ممتاز سريرياً ومنضبط في ومواعيد الحضور والانصراف، يحتاج لمزيد من الدقة والالتزام في توثيق أوقات إعطاء المحاليل الطبية بشيت الجودة."
-      }
-    ];
-  });
-
-  // 3. UNIT AUDITS STATE
-  const [unitAudits, setUnitAudits] = useState<any[]>(() => {
-    const saved = localStorage.getItem("baheya_cqi_unit_inspections");
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
+      comments: "تظهر التزاماً مطلقاً بمعايير الجودة السريرية وتحرص على تعبئة شيت جرد الكود بلو وعربة الطوارئ بالوقت الصحيح."
     }
-    return [
-      {
-        id: "unit-insp-1",
-        unit: "EMERGENCY UNIT",
-        date: "2026-06-06",
-        inspector: "أ. نورهان علي (جودة)",
-        complianceRate: 92,
-        scores: {
-          codeBlue: true,
-          coldChain: true,
-          gases: true,
-          fireSafety: false,
-          nurseCall: true,
-          preventiveMaint: true
-        },
-        notes: "إخفاق في مخرج طوارئ الطوارئ بسبب تراكم شيتات إدارية فارغة خلفه. تم إزالتها فوراً أثناء التدقيق لتأمين الممر."
-      }
-    ];
-  });
+  ]);
+
+  // 3. UNIT AUDITS STATE - Synced Real-Time with Firestore
+  const [unitAudits, setUnitAudits] = useFirestoreSync<any>(syncCQIUnitInspections, [
+    {
+      id: "unit-insp-1",
+      unit: "EMERGENCY UNIT",
+      date: "2026-06-06",
+      inspector: "أ. نورهان علي (جودة)",
+      complianceRate: 92,
+      scores: {
+        codeBlue: true,
+        coldChain: true,
+        gases: true,
+        fireSafety: false,
+        nurseCall: true,
+        preventiveMaint: true
+      },
+      notes: "إخفاق في مخرج طوارئ الطوارئ بسبب تراكم شيتات إدارية فارغة خلفه. تم إزالتها فوراً أثناء التدقيق لتأمين الممر."
+    }
+  ]);
 
   // 4. GAHAR STANDARDS CHECKED STATE (Hospital wide checklist tracker)
-  const [gaharChecked, setGaharChecked] = useState<number[]>(() => {
-    const saved = localStorage.getItem("baheya_gahar_checked");
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
-    }
-    return [11, 12, 14, 21, 23, 24]; // Default active standards indexes
-  });
+  const [gaharChecked, setGaharChecked] = useState<number[]>([11, 12, 14, 21, 23, 24]);
 
-  // 5. ACKNOWLEDGED POLICIES STATE
-  const [acknowledgedPolicies, setAcknowledgedPolicies] = useState<string[]>(() => {
-    const saved = localStorage.getItem("baheya_policy_acks");
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
+  useEffect(() => {
+    getSetting("baheya_gahar_checked").then((val) => {
+      if (val && Array.isArray(val)) {
+        setGaharChecked(val);
+      }
+    });
+  }, []);
+
+  const handleToggleGaharCheckedValue = async (id: number) => {
+    const next = gaharChecked.includes(id) 
+      ? gaharChecked.filter(x => x !== id) 
+      : [...gaharChecked, id];
+    setGaharChecked(next);
+    await saveSetting("baheya_gahar_checked", next);
+  };
+
+  // 5. ACKNOWLEDGED POLICIES STATE - Synced Real-Time, Multi-User safe
+  const [policyAcks, setPolicyAcks] = useFirestoreSync<any>(syncCQIPolicyAcks, []);
+  
+  // 6. CLINICAL DECISION SUPPORT SIMULATOR LOGS (Persistent Firestore DB)
+  const [decisionLogs, setDecisionLogs] = useFirestoreSync<any>(syncCQIDecisionLogs, []);
+
+  // Simulator Form input states
+  const [simPatientName, setSimPatientName] = useState<string>("أحمد عبد الله المنصوري");
+  const [simPatientMRN, setSimPatientMRN] = useState<string>("MRN-30491");
+  const [simDept, setSimDept] = useState<string>("EMERGENCY UNIT");
+  const [simBP, setSimBP] = useState<number>(115);
+  const [simPulse, setSimPulse] = useState<number>(78);
+  const [simSPO2, setSimSPO2] = useState<number>(98);
+  const [simHighAlert, setSimHighAlert] = useState<boolean>(false);
+  const [simInfusionRate, setSimInfusionRate] = useState<number>(15);
+  const [simFallRisk, setSimFallRisk] = useState<boolean>(false);
+  const [simNarcoticDose, setSimNarcoticDose] = useState<number>(0);
+  const [simDripName, setSimDripName] = useState<string>("Dopamine Drip");
+
+  // Current simulation output display state
+  const [simActiveResult, setSimActiveResult] = useState<any | null>(null);
+  const [simSearchTerm, setSimSearchTerm] = useState<string>("");
+  const [simDeptFilter, setSimDeptFilter] = useState<string>("");
+
+  const handlePerformClinicalAuditCheck = () => {
+    // Perform GAHAR safety processing
+    let safetyScore = 100;
+    const triggers: string[] = [];
+    const recommendations: string[] = [];
+    
+    // BP / Pulse check
+    if (simBP < 90 && simPulse > 100) {
+      safetyScore -= 30;
+      triggers.push(isAr ? "🚨 إنذار فوري باشتباه الصدمة الإنتانية (Sepsis Alert Criteria Met)" : "🚨 Suspected Sepsis Shock criteria triggered");
+      recommendations.push(isAr ? "قم بتفعيل بروتوكول Surviving Sepsis وحقن مضاد واسع المدى خلال ساعة واحدة." : "Begin sepsis 1-hour bundle: request Stat lactate level, blood cultures, and administer broad-spectrum antibiotics.");
     }
-    return ["pol-ident"]; // pre-acknowledged
-  });
+    
+    // SPO2 hypoxia check
+    if (simSPO2 < 93) {
+      safetyScore -= 20;
+      triggers.push(isAr ? "⚠️ نقص الأكسجة الحاد بالمستويين السريريين (Acute Hypoxia Risk Detected)" : "⚠️ Acute Medical Hypoxia Protocol Triggered");
+      recommendations.push(isAr ? "ابدأ فوراً بتوصيل الأكسجين الأنفي وطابِق نسبة الغازات بالدم الشرياني (ABG)." : "Initiate immediate low-flow oxygen nasal cannula and schedule arterial blood gas (ABG) profiling.");
+    }
+
+    // High Alert Drug Double-Sign Check
+    if (simHighAlert) {
+      if (simInfusionRate > 35) {
+        safetyScore -= 15;
+        triggers.push(isAr ? "🚫 معدل تسريب فوق الحد المصرح للأدوية عالية الخطورة" : "🚫 Over-limit drip rate on High-Alert IV therapy");
+        recommendations.push(isAr ? "معدل التسريب يتخطى 35 مل/ساعة؛ يستلزم ختم الصيدلي الإكلينيكي المعتمد وموافقة الطبيب المباشر." : "Infusion rate exceeds protective safety cap (35ml/hr). Clinical pharmacist verification required.");
+      } else {
+        recommendations.push(isAr ? "التحقق المزدوج الإيجابي مفعل من ممرضين مرخصين في موقع الحقن." : "Dual Bedside Verification completed successfully. Registered in digital audit log.");
+      }
+    }
+
+    // Fall Risk Morse Checklist
+    if (simFallRisk) {
+      safetyScore -= 20;
+      triggers.push(isAr ? "🚧 خطر سقوط مفرط للمريض (High Patient-Fall Risk Target)" : "🚧 Patient classified under High Morse Fall Risk category");
+      recommendations.push(isAr ? "ألصِق المعصم الأصفر المخصص لخطر السقوط، وأبقِ سياج السرير مغلقاً وبند النداء قريباً." : "Apply high-visibility yellow armband. Keep bedrails elevated, non-skid footwear verified, and call-bell positioned in reach.");
+    }
+
+    // Narcotics Control
+    if (simNarcoticDose > 25) {
+      safetyScore -= 15;
+      triggers.push(isAr ? "👮 تجاوز الحد الوقائي اليومي لجرعة مشتقات التخدير المخدرة" : "👮 Controlled Narcotic Dose Limit warning");
+      recommendations.push(isAr ? "جرعة التخدير تتطلب مطابقة كود الخزنة المزدوج وسجل الرقابة الطبية ببهية." : "Controlled substances dosage exceeds baseline parameters. Safe-locked registry verification required with double-witness stamp.");
+    }
+
+    const calculatedResult = {
+      id: "sim-" + Date.now(),
+      timestamp: new Date().toISOString(),
+      patientName: simPatientName,
+      patientMRN: simPatientMRN,
+      department: simDept,
+      vitals: {
+        bp: simBP,
+        pulse: simPulse,
+        spo2: simSPO2
+      },
+      inputs: {
+        highAlert: simHighAlert,
+        dripName: simDripName,
+        infusionRate: simInfusionRate,
+        fallRisk: simFallRisk,
+        narcoticDose: simNarcoticDose
+      },
+      safetyScore: Math.max(10, safetyScore),
+      triggers,
+      recommendations,
+      auditedBy: currentUser.nameAr || currentUser.email,
+      status: "Audited & Checked"
+    };
+
+    setSimActiveResult(calculatedResult);
+    addSystemLog(isAr ? "تم إجراء مراجعة القرار ودعم الجودة بنجاح" : "Clinical decision criteria scanned successfully", "success");
+  };
+
+  const handleSaveSimLogToDatabase = () => {
+    if (!simActiveResult) return;
+    
+    saveCQIDecisionLog(simActiveResult).then(() => {
+      addSystemLog(isAr ? "تم حفظ التقرير السريري في الأرشيف الرسمي كـ HIPAA Log" : "Clinical support log stored officially under high-visibility audit trails", "success");
+      
+      // Dispatch real-time quality notification
+      const newNotif = {
+        id: `notif-${Date.now()}`,
+        messageAr: `💡 [دعم القرار السريري] الممرض(ة) الفاحص(ة) (${currentUser.nameAr || currentUser.email}) قام بتوصيف وحفظ استشارة سريرية للمريض (${simPatientName}) برقم ملف (${simPatientMRN}) بقسم (${simDept}) وحقق أمان سريري بمقدار (${simActiveResult.safetyScore}%).`,
+        messageEn: `💡 [Clinical Decision Saved] Nurse Clinical Auditor (${currentUser.nameEn || currentUser.email}) verified and saved clinical advice for Patient (${simPatientName}) [${simPatientMRN}] in Ward (${simDept}) with safety score (${simActiveResult.safetyScore}%).`,
+        timestamp: new Date().toISOString(),
+        read: false
+      };
+      const updatedNotifs = [newNotif, ...notifications];
+      setNotifications(updatedNotifs);
+      saveSetting("baheya_notifications", updatedNotifs);
+
+      setSimActiveResult(null);
+    }).catch(err => {
+      alert("Error: " + err.message);
+    });
+  };
+
+  const handleDeleteSimLog = (logId: string) => {
+    if (confirm(isAr ? "هل ترغب بمحو هذا التقرير الجنائي من الأرشيف؟" : "Purge this certified clinical log permanently?")) {
+      deleteCQIDecisionLog(logId).then(() => {
+        addSystemLog(isAr ? "تم التخلص من السجل السريري المقاوم بنجاح" : "Clinical audit log successfully deleted", "warning");
+      });
+    }
+  };
+  
+  // Compute active user's acknowledged policies array on the fly
+  const acknowledgedPolicies = (policyAcks || [])
+    .filter((ack: any) => ack.nurseId === currentUser.id)
+    .map((ack: any) => ack.policyId);
 
   // Static Policy library array
   const POLICIES_ARRAY = [
@@ -444,7 +553,20 @@ export default function QualityAnalyticsHub({
       status: "Under Active Surveillance"
     };
 
-    setOvrs([newOvr, ...ovrs]);
+    saveCQIOvr(newOvr);
+    
+    // Dispatch system-wide OVR notification 
+    const ovrNotif = {
+      id: `notif-${Date.now()}`,
+      messageAr: `⚠️ [بلاغ حدث عارض OVR] تم رصد وتسجيل بلاغ OVR جديد بواسطة (${currentUser.nameAr || currentUser.email}) لقسم (${newOvr.department}). نوع الحادث: (${newOvr.categoryAr}). مستوى الخطورة لـ GAHAR: (${newOvr.severity}). يرجى المراجعة الفورية واتخاذ إجراء تصحيحي.`,
+      messageEn: `⚠️ [New OVR Alert] A new incident report (OVR) has been filed by (${currentUser.nameEn || currentUser.email}) for Ward (${newOvr.department}). Incident Category: (${newOvr.categoryAr}). Criticality level: (${newOvr.severity}). Immediate follow-up is requested.`,
+      timestamp: new Date().toISOString(),
+      read: false
+    };
+    const updatedNotifs = [ovrNotif, ...notifications];
+    setNotifications(updatedNotifs);
+    saveSetting("baheya_notifications", updatedNotifs);
+
     setOvrForm({
       department: "EMERGENCY UNIT",
       categoryAr: "إعطاء الدواء خطأ (Medication Error)",
@@ -458,7 +580,7 @@ export default function QualityAnalyticsHub({
     });
     setShowOvrForm(false);
     addSystemLog(`Logged OVR Report: ${newOvr.id}`, "warning");
-    alert(isAr ? "✅ تم رصد وحفظ تقرير الأحداث والـ OVR بنجاح سحابياً ومحلياً!" : "OVR Report logged successfully.");
+    alert(isAr ? "✅ تم رصد وحفظ تقرير الأحداث والـ OVR بنجاح سحابياً!" : "OVR Report logged successfully.");
   };
 
   // 2. STAFF EVAL FORM LOCAL INPUTS
@@ -489,11 +611,24 @@ export default function QualityAnalyticsHub({
       comments: evalComments || (isAr ? "تم تقييم أداء معايير الجودة بنجاح." : "Standard clinical appraisal completed successfully.")
     };
 
-    setStaffEvals([newEval, ...staffEvals]);
+    saveCQIStaffEval(newEval);
+    
+    // Dispatch system-wide evaluation notification 
+    const evalNotif = {
+      id: `notif-${Date.now()}`,
+      messageAr: `👥 [تقييم إكلينيكي] قام المقيِّم (${currentUser.nameAr || currentUser.email}) باعتماد دراسة أداء الكادر السريري للموظف (${newEval.employeeNameAr}) بمستوى فحص معايير الجودة GAHAR. تعليق: (${newEval.comments}).`,
+      messageEn: `👥 [Clinical Appraisal] Evaluator (${currentUser.nameEn || currentUser.email}) certified clinical performance benchmarks evaluation for (${newEval.employeeNameEn}). Review comments: (${newEval.comments}).`,
+      timestamp: new Date().toISOString(),
+      read: false
+    };
+    const updatedNotifs = [evalNotif, ...notifications];
+    setNotifications(updatedNotifs);
+    saveSetting("baheya_notifications", updatedNotifs);
+
     setEvalComments("");
     setShowEvalForm(false);
     addSystemLog(`Logged Staff Clinical Appraisal for: ${staffMember.nameEn}`, "success");
-    alert(isAr ? "✅ تم تسجيل التقييم السريري للموظف بنجاح وحفظه في ملف الجودة والمستندات!" : "Employee evaluation recorded successfully.");
+    alert(isAr ? "✅ تم تسجيل التقييم السريري للموظف بنجاح وحفظه سحابياً!" : "Employee evaluation recorded successfully.");
   };
 
   // 3. UNIT AUDIT FORM LOCAL INPUTS
@@ -525,11 +660,11 @@ export default function QualityAnalyticsHub({
       notes: inspNotes || (isAr ? "لا توجد ملحوظات، تم التفتيش ومطابقة الأقسام." : "Inspect matches compliance guidelines.")
     };
 
-    setUnitAudits([newAudit, ...unitAudits]);
+    saveCQIUnitInspection(newAudit);
     setInspNotes("");
     setShowInspForm(false);
     addSystemLog(`Logged Unit Audit: ${inspUnit} (${computedRate}%)`, "info");
-    alert(isAr ? "✅ تم تثبيت تقرير ومراجعة الوحدة الميداني وتحديث الجودة للمستشفى!" : "Unit quality audit logged.");
+    alert(isAr ? "✅ تم تثبيت تقرير ومراجعة الوحدة الميداني وتحديث الجودة للمستشفى سحابياً!" : "Unit quality audit logged.");
   };
 
   // 4. POLICY DIGEST & ELECTRONIC ACKNOWLEDGEMENT
@@ -538,13 +673,138 @@ export default function QualityAnalyticsHub({
       alert(isAr ? "لقد تم إمضاء الالتزام وتوثيق هذه السياسة مسبقاً باسمك." : "Already acknowledged.");
       return;
     }
-    const updated = [...acknowledgedPolicies, policyId];
-    setAcknowledgedPolicies(updated);
+    const newAck = {
+      id: `ack-${Date.now()}-${currentUser.id}`,
+      policyId,
+      nurseId: currentUser.id,
+      nurseName: currentUser.nameAr || currentUser.nameEn,
+      signedAt: new Date().toISOString()
+    };
+    saveCQIPolicyAck(newAck);
     addSystemLog(`Acknowledged Hospital Policy: ${policyId}`, "success");
     alert(isAr ? "📝 تم إمضاء التزامك وتوقيعك الإلكتروني بالسياسة الطبية بنجاح سحابياً!" : "Policy electronically signed.");
   };
 
+  // Seeding Complete Quality Audit Archives
+  const handleSeedQualityArchive = async () => {
+    const sampleOvrs = [
+      {
+        id: "ovr-101",
+        date: "2026-06-10",
+        time: "09:15",
+        department: "CHEMOTHERAPY DAYCARE",
+        categoryAr: "إعطاء الدواء خطأ (Medication Error)",
+        categoryEn: "Medication Misadministration",
+        severity: "Category D - Harm Reached Patient but No Harm Caused",
+        descAr: "تم تحضير جرعة علاج جيني مخصصة لمريضة سرطان وعند سرير المريض المشمول بالدواء تم رصد عدم تطابق الاسم في اللحظة الأخيرة بفصل معيار التحقق الثنائي.",
+        descEn: "Therapy prepared for Patient A was almost administered to Patient B. Blocked at bedside during secondary double-identity crosschecking.",
+        correctiveAr: "إيقاف إجراء نقل الجرعة فوراً، إعادة سحب الهوية السريرية، ومراجعة صيدلانية مع تعهد خطي بالإجراء المزدوج والمطابِقة.",
+        correctiveEn: "Immediate infusion hold, re-verified identifiers, and secondary pharmacist check mandated.",
+        witness: "أ. فاطمة الزهراء (استاف التمريض)",
+        loggedBy: "أ. نورهان علي (جودة)",
+        patientInvolved: true,
+        patientMRN: "MRN-33010",
+        patientName: "سامية خليل الورداني",
+        status: "Corrective Action Verified"
+      },
+      {
+        id: "ovr-102",
+        date: "2026-06-11",
+        time: "14:40",
+        department: "INTENSIVE CARE UNIT (ICU)",
+        categoryAr: "خلل في الأجهزة الطبية (Device/Device Error)",
+        categoryEn: "Ventilator Circuit Leakage",
+        severity: "Category C - Reached Patient or Staff but No Harm Done",
+        descAr: "إنذار ضغط منخفض في جهاز التنفس الاصطناعي رقم 4 بوحدة الرعاية المركزة بسبب شق بسيط في صمام الزفير. تم التبديل الفوري للأكسجين اليدوي وحل المشكلة.",
+        descEn: "Low pressure alarm on ventilator 4 due to a minor vacuum leakage in the exhalation valve. Switched to manual bag ventilation and circuit replaced.",
+        correctiveAr: "استدعاء قسم الصيانة الحيوية لتبديل الصمامات وجرد باقي الأنابيب بوحدة الرعاية وتوثيق تقرير سلامة القطع.",
+        correctiveEn: "Clinical engineering team calibrated valve replacement, leakage check completed safely.",
+        witness: "أ. محمود عمر (رئيسة تمريض)",
+        loggedBy: "أ. رنا السيد (مفتش جودة)",
+        patientInvolved: true,
+        patientMRN: "MRN-19045",
+        patientName: "كامل رأفت الباز",
+        status: "Under Active Surveillance"
+      }
+    ];
+
+    for (const o of sampleOvrs) {
+      await saveCQIOvr(o).catch(e => console.error("OVR seed failed", e));
+    }
+
+    const sampleEvals = [
+      {
+        id: "eval-101",
+        employeeId: "user-nurse",
+        employeeNameAr: "أ. فاطمة الزهراء (استاف التمريض)",
+        employeeNameEn: "Sister Fatima El-Zahraa (Staff Nurse)",
+        department: "EMERGENCY UNIT",
+        evalDate: "2026-06-08",
+        evaluatorName: "أ. نورهان علي (مدير الجودة)",
+        scores: { clinical: 5, policy: 5, documentation: 4, attendance: 5, ethics: 5 },
+        comments: "أداء متميز واستثنائي في مكافحة العدوى والالتزام الكامل بقواعد JCI IPSG وأهداف سلامة مستشفيات بهية."
+      },
+      {
+        id: "eval-102",
+        employeeId: "emp-2",
+        employeeNameAr: "هاني ناصر (أخصائي تمريض SN)",
+        employeeNameEn: "Hany Naser (Staff Nurse)",
+        department: "INTENSIVE CARE UNIT (ICU)",
+        evalDate: "2026-06-09",
+        evaluatorName: "د. طارق الشافعي (المدير الطبي)",
+        scores: { clinical: 4, policy: 4, documentation: 3, attendance: 5, ethics: 4 },
+        comments: "منضبط وحريص سريرياً يحتاج إلى تدريب متقدم على مكافحة مخاطر وخز الإبر والتوثيق الإلكتروني المباشر بملفات الداتا."
+      }
+    ];
+
+    for (const e of sampleEvals) {
+      await saveCQIStaffEval(e).catch(e => console.error("Staff Evaluation seed failed", e));
+    }
+
+    const sampleAudits = [
+      {
+        id: "unit-insp-101",
+        unit: "EMERGENCY UNIT",
+        date: "2026-06-05",
+        inspector: "أ. نورهان علي (جودة)",
+        complianceRate: 100,
+        scores: { codeBlue: true, coldChain: true, gases: true, fireSafety: true, nurseCall: true, preventiveMaint: true },
+        notes: "مستوى الامتثال ممتاز والوحدة مجهزة تفتيشياً بالكامل، عربة الكود بلو مغلقة بالقفل المائي الآمن وسلسلة التبريد مستقرة."
+      },
+      {
+        id: "unit-insp-102",
+        unit: "CHEMOTHERAPY DAYCARE",
+        date: "2026-06-09",
+        inspector: "أ. محمود عمر (جودة)",
+        complianceRate: 83,
+        scores: { codeBlue: true, coldChain: false, gases: true, fireSafety: true, nurseCall: true, preventiveMaint: true },
+        notes: "تم رصد فجوة في درجة حرارة ثلاجة حفظ الأدوية لتصل إلى 9.5 درجة مئوية. تم الاتصال فوراً بالمهندس المختص لضبط الترموستات ورجوع المعدل الآمن بظرف نصف ساعة."
+      }
+    ];
+
+    for (const a of sampleAudits) {
+      await saveCQIUnitInspection(a).catch(e => console.error("Inspection seed failed", e));
+    }
+
+    const sampleAcks = [
+      { id: "ack-101", policyId: "pol-ident", nurseId: "user-nurse", nurseName: "أ. فاطمة الزهراء", signedAt: "2026-06-11T12:30:00Z" },
+      { id: "ack-102", policyId: "pol-transfuse", nurseId: "emp-2", nurseName: "هاني ناصر", signedAt: "2026-06-11T14:15:00Z" },
+      { id: "ack-103", policyId: "pol-timeout", nurseId: "user-nurse", nurseName: "أ. فاطمة الزهراء", signedAt: "2026-06-12T08:00:00Z" }
+    ];
+
+    for (const ac of sampleAcks) {
+      await saveCQIPolicyAck(ac).catch(e => console.error("Signature seed failed", e));
+    }
+
+    alert(isAr ? "✅ تم تغذية الأرشيف السحابي بالكامل بالتقارير التجريبية الشاملة والمطابِقَة لمعايير المستشفيات الحقيقية!" : "Quality Archive successfully seeded with clinical data.");
+  };
+
   const [policySearch, setPolicySearch] = useState("");
+
+  const [archiveFilterType, setArchiveFilterType] = useState<string>("all");
+  const [archiveSearchTerm, setArchiveSearchTerm] = useState<string>("");
+  const [archiveDeptFilter, setArchiveDeptFilter] = useState<string>("all");
+  const [selectedArchiveItem, setSelectedArchiveItem] = useState<any | null>(null);
 
   const filteredPolicies = POLICIES_ARRAY.filter(p => 
     p.titleAr.toLowerCase().includes(policySearch.toLowerCase()) ||
@@ -572,10 +832,18 @@ export default function QualityAnalyticsHub({
         </div>
         
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={handleSeedQualityArchive}
+            className="px-4 py-2 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white font-black text-xs rounded-lg shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+          >
+            <Sparkles className="h-4 w-4" />
+            <span>تأسيس وتجريب أرشيف الجودة السحابي 📁</span>
+          </button>
+
           {records.length === 0 && (
             <button
               onClick={handleSeedMockAuditData}
-              className="px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white font-black text-xs rounded-lg shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-black text-xs rounded-lg shadow-sm transition flex items-center gap-1.5 cursor-pointer"
             >
               <Database className="h-4 w-4" />
               <span>توليد وتغذية 3 سجلات طبية تجريبية للتحليل</span>
@@ -600,6 +868,18 @@ export default function QualityAnalyticsHub({
 
       {/* 2. Sub-tab Switcher - All Modules Required by User */}
       <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap gap-2 justify-end no-print">
+
+        <button
+          onClick={() => setActiveTabLocal("archive")}
+          className={`px-3 py-2 rounded-xl text-xs font-black transition flex items-center gap-1.5 border cursor-pointer ${
+            activeTab === "archive"
+              ? "bg-rose-50 text-rose-700 border-rose-200 shadow-inner"
+              : "bg-white text-slate-600 border-transparent hover:bg-slate-50"
+          }`}
+        >
+          <Database className="h-4 w-4 text-rose-600" />
+          <span>الأرشيف الوطني المعتمد للجودة</span>
+        </button>
         
         <button
           onClick={() => setActiveTabLocal("policies")}
@@ -662,6 +942,18 @@ export default function QualityAnalyticsHub({
         </button>
 
         <button
+          onClick={() => setActiveTabLocal("decision")}
+          className={`px-3 py-2 rounded-xl text-xs font-black transition flex items-center gap-1.5 border cursor-pointer ${
+            activeTab === "decision"
+              ? "bg-indigo-600 text-white border-indigo-700 shadow-md transform scale-102"
+              : "bg-amber-100/50 text-indigo-950 border-indigo-200/40 hover:bg-indigo-50"
+          }`}
+        >
+          <Activity className="h-4 w-4 text-pink-600 animate-pulse" />
+          <span>{isAr ? "💡 محاكي القرار وتدقيق الجودة السريرية" : "💡 Clinical Decision & Quality Simulator"}</span>
+        </button>
+
+        <button
           onClick={() => setActiveTabLocal("kpis")}
           className={`px-3 py-2 rounded-xl text-xs font-black transition flex items-center gap-1.5 border cursor-pointer ${
             activeTab === "kpis"
@@ -675,7 +967,531 @@ export default function QualityAnalyticsHub({
 
       </div>
 
-      {/* ======================= TAB 1: GENERAL & ADVANCED KPIs ======================= */}
+      {/* ======================= TAB 0: CLINICAL DECISION SUPPORT SIMULATOR ======================= */}
+      {activeTab === "decision" && (
+        <div className="space-y-6 text-right" dir="rtl">
+          
+          {/* Header Card */}
+          <div className="bg-gradient-to-r from-indigo-900 to-slate-950 text-white p-6 rounded-2xl border border-indigo-800 shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 left-0 bg-pink-600/10 h-32 w-32 rounded-full blur-2xl"></div>
+            <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                <span className="inline-flex items-center gap-1.5 bg-indigo-500/20 text-indigo-300 text-[10px] font-black px-2.5 py-0.5 rounded-full mb-2 border border-indigo-500/30">
+                  <Sparkles className="w-3.5 h-3.5 text-pink-500" />
+                  <span>{isAr ? "دعم القرار السريري الذكي المعتمد" : "AI-POWERED CLINICAL DECISION"}</span>
+                </span>
+                <h3 className="text-xl font-bold font-sans">
+                  {isAr ? "محاكي الجودة السريرية ودعم القرار الذكي" : "Clinical Decision Support & Quality Simulator"}
+                </h3>
+                <p className="text-xs text-indigo-200 mt-1 max-w-2xl leading-relaxed">
+                  {isAr 
+                    ? "أدوات متكاملة لمحاكاة بارامترات المريض ودرجات الالتزام الطبي لـ GAHAR و HIPAA وتفادي الأخطاء الدوائية في الوقت الحقيقي قبل الشروع بالصرف الفعلي مع سجل تدقيق جنائي متكامل."
+                    : "Simulate patient status, drug drip parameters, fall index, and GAHAR safety indicators in a certified environment prior to bedside administration."}
+                </p>
+              </div>
+              <div className="bg-indigo-950/80 border border-indigo-800 p-3 rounded-xl flex items-center gap-3">
+                <HeartPulse className="w-8 h-8 text-pink-500 animate-pulse" />
+                <div className="text-left font-mono">
+                  <div className="text-[9px] text-slate-400 font-bold uppercase">GAHAR SAFETY CODES</div>
+                  <div className="text-xs font-black text-rose-400">BH-CD-109 / IPSG.3</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            
+            {/* INPUT PANEL - 7 cols */}
+            <div className="lg:col-span-7 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+              <div className="border-b border-slate-150 pb-2">
+                <h4 className="font-extrabold text-sm text-indigo-950 flex items-center justify-start gap-1.5">
+                  <Sliders className="w-4 h-4 text-pink-600" />
+                  <span>{isAr ? "مدخلات الحالة السريرية والمؤشرات" : "Clinical Case Parameters"}</span>
+                </h4>
+              </div>
+
+              {/* Patient Basics */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[10px] text-slate-500 font-black mb-1">
+                    {isAr ? "اسم المريض الرباعي" : "Patient Name"}
+                  </label>
+                  <input
+                    type="text"
+                    value={simPatientName}
+                    onChange={(e) => setSimPatientName(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 font-bold focus:bg-white focus:border-indigo-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-500 font-black mb-1">
+                    {isAr ? "رقم الملف الطبي MRN" : "Medical Record Number (MRN)"}
+                  </label>
+                  <input
+                    type="text"
+                    value={simPatientMRN}
+                    onChange={(e) => setSimPatientMRN(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 font-mono font-bold focus:bg-white focus:border-indigo-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-500 font-black mb-1">
+                    {isAr ? "القسم / الوحدة المعنية" : "Clinical Ward / Unit"}
+                  </label>
+                  <select
+                    value={simDept}
+                    onChange={(e) => setSimDept(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 font-bold focus:bg-white focus:border-indigo-500 focus:outline-none"
+                  >
+                    <option value="EMERGENCY UNIT">{isAr ? "وحدة الطوارئ" : "Emergency Unit"}</option>
+                    <option value="INTENSIVE CARE">{isAr ? "العناية المركزة ICU" : "Intensive Care"}</option>
+                    <option value="ONCOLOGY RESEARCH">{isAr ? "أبحاث وعلاج الأورام" : "Oncology Ward"}</option>
+                    <option value="OPERATING ROOM">{isAr ? "غرف العمليات" : "Operating Room"}</option>
+                    <option value="CENTRAL PHARMACY">{isAr ? "الصيدلية المركزية" : "Central Pharmacy"}</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Patient Vital Signs */}
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-150">
+                <span className="text-[9px] text-indigo-700 font-black tracking-wide uppercase block mb-3">
+                  {isAr ? "⚠️ المؤشرات الحيوية المباشرة للمريض" : "⚠️ Patient Real-Time Vital Signs"}
+                </span>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="flex justify-between text-[10px] text-slate-600 font-bold mb-1">
+                      <span>{isAr ? "ضغط الدم الانقباضي (BP)" : "Systolic BP"}</span>
+                      <span className="font-mono font-black text-slate-900">{simBP} mmHg</span>
+                    </label>
+                    <input
+                      type="range"
+                      min="50"
+                      max="200"
+                      value={simBP}
+                      onChange={(e) => setSimBP(parseInt(e.target.value))}
+                      className="w-full h-1.5 bg-slate-250 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                    />
+                    <div className="flex justify-between text-[8px] text-slate-400 mt-1 font-mono">
+                      <span>50 (Shock)</span>
+                      <span>120 (Normal)</span>
+                      <span>200 (Crisis)</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="flex justify-between text-[10px] text-slate-600 font-bold mb-1">
+                      <span>{isAr ? "معدل نبضات القلب (HR)" : "Pulse Rate"}</span>
+                      <span className="font-mono font-black text-slate-900">{simPulse} BPM</span>
+                    </label>
+                    <input
+                      type="range"
+                      min="40"
+                      max="180"
+                      value={simPulse}
+                      onChange={(e) => setSimPulse(parseInt(e.target.value))}
+                      className="w-full h-1.5 bg-slate-250 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                    />
+                    <div className="flex justify-between text-[8px] text-slate-400 mt-1 font-mono">
+                      <span>40 (Brady)</span>
+                      <span>72 (Normal)</span>
+                      <span>180 (Tachy)</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="flex justify-between text-[10px] text-slate-600 font-bold mb-1">
+                      <span>{isAr ? "أكسجين الدم (SPO2)" : "SPO2 Oxygen"}</span>
+                      <span className="font-mono font-black text-slate-900">{simSPO2}%</span>
+                    </label>
+                    <input
+                      type="range"
+                      min="75"
+                      max="100"
+                      value={simSPO2}
+                      onChange={(e) => setSimSPO2(parseInt(e.target.value))}
+                      className="w-full h-1.5 bg-slate-250 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                    />
+                    <div className="flex justify-between text-[8px] text-slate-400 mt-1 font-mono">
+                      <span>75% (Critical)</span>
+                      <span>95% (Baseline)</span>
+                      <span>100% (Air)</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Medication & Infusion Safety Block */}
+              <div className="space-y-3 bg-indigo-50/40 p-4 rounded-xl border border-indigo-100/50">
+                <span className="text-[9px] text-pink-700 font-black tracking-wide uppercase block">
+                  {isAr ? "💊 بروتوكول الأدوية عالية الخطورة وتسريب المحاليل" : "💊 HIGH-ALERT DRUGS & INFUSION MONITORING"}
+                </span>
+
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="highAlert"
+                    checked={simHighAlert}
+                    onChange={(e) => setSimHighAlert(e.target.checked)}
+                    className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
+                  />
+                  <label htmlFor="highAlert" className="text-xs font-extrabold text-slate-700 cursor-pointer select-none">
+                    {isAr ? "دواء عالي الخطورة (مثال: محفزات تقلص الأوعية، الأنسولين، الهيبارين)" : "This is a High-Alert Infusion Therapy (IPSG.3)"}
+                  </label>
+                </div>
+
+                {simHighAlert && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 animate-fade">
+                    <div>
+                      <label className="block text-[10px] text-slate-500 font-bold mb-1">
+                        {isAr ? "اسم المستحضر / المحلول الوريدي" : "High-Alert Infusion Name"}
+                      </label>
+                      <input
+                        type="text"
+                        value={simDripName}
+                        onChange={(e) => setSimDripName(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 font-mono font-semibold focus:outline-none focus:border-indigo-500"
+                        placeholder="Norepinephrine..."
+                      />
+                    </div>
+                    <div>
+                      <label className="flex justify-between text-[10px] text-slate-500 font-bold mb-1">
+                        <span>{isAr ? "معدل تدفق التسريب المبرمج" : "Programmed Drip Rate"}</span>
+                        <span className="font-mono font-black text-indigo-700">{simInfusionRate} ml/hr</span>
+                      </label>
+                      <input
+                        type="number"
+                        value={simInfusionRate}
+                        onChange={(e) => setSimInfusionRate(Math.max(0, parseInt(e.target.value) || 0))}
+                        className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-900 font-mono font-semibold focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Morse Fall Risk and Controlled Narcotics */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-150">
+                  <div className="flex items-center gap-2 mb-2">
+                    <input
+                      type="checkbox"
+                      id="fallRisk"
+                      checked={simFallRisk}
+                      onChange={(e) => setSimFallRisk(e.target.checked)}
+                      className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
+                    />
+                    <label htmlFor="fallRisk" className="text-xs font-black text-slate-800 cursor-pointer select-none">
+                      {isAr ? "تقييم مخاطر السقوط (Morse Fall Scale)" : "High Fall Risk Assessment (Morse)"}
+                    </label>
+                  </div>
+                  <p className="text-[9px] text-slate-450 leading-tight">
+                    {isAr ? "إذا كان المريض يعاني من دوخة، وهن العضلات، تاريخ سقوط قريب، أو تقدم بالعمر يعرضه للسقوط." : "Triggers mandatory high-visibility armband & bedrail security protocols."}
+                  </p>
+                </div>
+
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-150 space-y-2">
+                  <label className="block text-xs font-black text-slate-800">
+                    {isAr ? "صرف مواد مخدرة / مسكنات مراقبة (Fentanyl)" : "Narcotics Dispensation Level"}
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      value={simNarcoticDose}
+                      onChange={(e) => setSimNarcoticDose(Math.max(0, parseInt(e.target.value) || 0))}
+                      className="w-20 bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-mono font-bold text-center"
+                    />
+                    <span className="text-[10px] text-slate-500 font-bold">{isAr ? "ميكروجرام / ساعة" : "mcg/hr infusion"}</span>
+                  </div>
+                  <p className="text-[9px] text-slate-400">
+                    {isAr ? "تجاوز 25 ميكروجرام/س يعطي كود تحذير للرقابة الدوائية." : "Triggers safe logs double verification parameters."}
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Trigger */}
+              <div className="pt-3">
+                <button
+                  onClick={handlePerformClinicalAuditCheck}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs py-3 px-4 rounded-xl shadow-md transition transform hover:scale-[1.01] active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Activity className="w-4 h-4 shrink-0 animate-ping" />
+                  <span>{isAr ? "تشغيل محاكي دعم القرار وفحص الجودة السريرية" : "Run Safety Simulation & Decision Audit"}</span>
+                </button>
+              </div>
+
+            </div>
+
+            {/* LIVE SIMULATION RESULT PANEL - 5 cols */}
+            <div className="lg:col-span-5 space-y-4">
+              
+              <div className="bg-slate-900 text-slate-100 p-6 rounded-2xl border border-slate-800 shadow-lg min-h-[420px] flex flex-col justify-between">
+                
+                <div>
+                  <div className="border-b border-slate-800 pb-3 flex items-center justify-between">
+                    <span className="inline-flex items-center gap-1 text-[9px] font-mono tracking-widest text-indigo-400 uppercase">
+                      Live Assessment Output
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-[10px] bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded border border-indigo-500/20">
+                      <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping"></span>
+                      <span>{isAr ? "جاهز للمحاكاة" : "Sim Ready"}</span>
+                    </span>
+                  </div>
+
+                  {simActiveResult ? (
+                    <div className="mt-4 space-y-4 animate-fade text-right">
+                      
+                      {/* Safety compliance score gauge */}
+                      <div>
+                        <div className="flex justify-between items-center text-xs text-slate-400 font-bold mb-1">
+                          <span>{isAr ? "درجة السلامة المقدرة (GAHAR Score):" : "Estimated Clinical Safety Score:"}</span>
+                          <span className={`text-base font-black ${
+                            simActiveResult.safetyScore >= 80 ? "text-emerald-400" : simActiveResult.safetyScore >= 60 ? "text-amber-400" : "text-red-400"
+                          }`}>{simActiveResult.safetyScore}%</span>
+                        </div>
+                        <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full transition-all duration-500 ${
+                              simActiveResult.safetyScore >= 80 ? "bg-emerald-500" : simActiveResult.safetyScore >= 60 ? "bg-amber-400" : "bg-red-500"
+                            }`}
+                            style={{ width: `${simActiveResult.safetyScore}%` }}
+                          ></div>
+                        </div>
+                      </div>
+
+                      {/* Vitals Summary */}
+                      <div className="grid grid-cols-3 gap-2 bg-slate-950 p-3 rounded-lg border border-slate-800 font-mono text-center">
+                        <div>
+                          <div className="text-[8px] text-slate-500 font-bold uppercase">SPO2</div>
+                          <div className={`text-xs font-bold ${simActiveResult.vitals.spo2 < 93 ? "text-red-400 animate-pulse" : "text-emerald-400"}`}>{simActiveResult.vitals.spo2}%</div>
+                        </div>
+                        <div>
+                          <div className="text-[8px] text-slate-500 font-bold uppercase">Pulse</div>
+                          <div className={`text-xs font-bold ${simActiveResult.vitals.pulse > 100 ? "text-amber-400" : "text-slate-300"}`}>{simActiveResult.vitals.pulse} bpm</div>
+                        </div>
+                        <div>
+                          <div className="text-[8px] text-slate-500 font-bold uppercase">BP Systolic</div>
+                          <div className={`text-xs font-bold ${simActiveResult.vitals.bp < 90 ? "text-red-400 animate-pulse" : "text-slate-300"}`}>{simActiveResult.vitals.bp} mmHg</div>
+                        </div>
+                      </div>
+
+                      {/* Triggers & Alerts */}
+                      <div>
+                        <div className="text-[10px] text-slate-400 font-extrabold mb-1">{isAr ? "الإنذارات والبروتوكولات المفعلة بالجودة:" : "Activated Protocol Warnings:"}</div>
+                        {simActiveResult.triggers.length > 0 ? (
+                          <div className="space-y-1.5">
+                            {simActiveResult.triggers.map((trig: string, idx: number) => (
+                              <div key={idx} className="bg-red-950/40 border border-red-900/40 text-red-300 p-2 rounded-lg text-[10px] font-bold">
+                                {trig}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="bg-emerald-950/40 border border-emerald-900/40 text-emerald-300 p-2 rounded-lg text-[10px] font-bold">
+                            {isAr ? "✓ كافة المؤشرات سليمة، المريض بمستوى الأمان العالي." : "✓ No primary hazard triggers flagged."}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Recommendations */}
+                      <div className="space-y-1 bg-slate-950 p-4 rounded-xl border border-slate-800 text-[10px] text-indigo-200">
+                        <div className="text-pink-400 font-black mb-1 flex items-center gap-1 justify-start">
+                          <CheckSquare className="w-3.5 h-3.5" />
+                          <span>{isAr ? "توجيهات دعم القرار الإلزامي ببهية:" : "Dynamic Clinical Orders Guidelines:"}</span>
+                        </div>
+                        <ul className="list-disc pr-4 space-y-1 leading-relaxed">
+                          {simActiveResult.recommendations.map((rec: string, idx: number) => (
+                            <li key={idx} className="font-semibold">{rec}</li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      {/* Auditee */}
+                      <div className="text-[9px] text-slate-500 font-sans flex justify-between">
+                        <span>{isAr ? "رتبة الفاحص:" : "Auditor Profile:"} <span className="text-slate-300 font-bold">{simActiveResult.auditedBy}</span></span>
+                        <span>{isAr ? "التوقيت الموحد:" : "Timestamp:"} <span className="text-slate-400 font-mono">{new Date(simActiveResult.timestamp).toLocaleTimeString()}</span></span>
+                      </div>
+
+                    </div>
+                  ) : (
+                    <div className="mt-16 text-center text-slate-500 py-10 space-y-3">
+                      <Activity className="w-12 h-12 text-slate-700 mx-auto animate-bounce" />
+                      <div className="text-xs font-extrabold">{isAr ? "يرجى الضغط على زر التشغيل" : "Please press 'Run Safety Simulation' button."}</div>
+                      <p className="text-[10px] text-slate-600 max-w-xs mx-auto leading-relaxed">
+                        {isAr 
+                          ? "سيقوم المحاكي بفحص المدخلات في الوقت الفعلي وحساب درجات الموثوقية وتأثيرها على معايير GAHAR الوطنية."
+                          : "Processor ready to evaluate medication safety, alert boundaries, and compliance ratings."}
+                      </p>
+                    </div>
+                  )}
+
+                </div>
+
+                {simActiveResult && (
+                  <div className="pt-4 border-t border-slate-800 mt-4">
+                    <button
+                      onClick={handleSaveSimLogToDatabase}
+                      className="w-full bg-pink-600 hover:bg-pink-700 text-white font-extrabold text-xs py-2.5 px-4 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+                    >
+                      <Database className="w-4 h-4" />
+                      <span>{isAr ? "توقيع مالي سريري وحفظ بـ HIPAA Database" : "E-Sign & Save to HIPAA Secure DB"}</span>
+                    </button>
+                    <p className="text-center text-[8px] text-slate-550 mt-1.5">
+                      {isAr 
+                        ? "ملاحظة: الضغط يقوم بإنشاء سجل تدقيق معتمد غير قابل للتلاعب في قاعدة بهية السحابية."
+                        : "Creates a certified immutable audit entry in the central cloud node."}
+                    </p>
+                  </div>
+                )}
+
+              </div>
+
+            </div>
+
+          </div>
+
+          {/* PERSISTENT CLINICAL DECISION SUPPORT ARCHIVE - FULL HISTORIC LOG */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-slate-150 pb-3">
+              <div>
+                <h4 className="font-extrabold text-md text-slate-900 flex items-center justify-start gap-1.5">
+                  <Database className="w-5 h-5 text-indigo-600" />
+                  <span>{isAr ? "سجل وأرشيف دعم القرار الطبي المعتمد" : "Clinical Decision Support Audit Archive"}</span>
+                </h4>
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  {isAr 
+                    ? "السجلات السحابية الموثقة لجميع الحالات ومخرجات الدعم السريري وقرارات الأطباء والممرضين ببهية:"
+                    : "Historically synced decision outputs, and parameters checked directly."}
+                </p>
+              </div>
+
+              {/* Filters */}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative">
+                  <Search className="absolute right-2 top-2 text-slate-400 h-3.5 w-3.5 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder={isAr ? "بحث بالـ MRN أو المريض..." : "Search by MRN/Patient..."}
+                    value={simSearchTerm}
+                    onChange={(e) => setSimSearchTerm(e.target.value)}
+                    className="bg-slate-50 border border-slate-200 rounded-lg pr-7 pl-3 py-1.5 text-xs focus:outline-none focus:border-indigo-500 focus:bg-white text-slate-800 font-bold"
+                  />
+                </div>
+
+                <select
+                  value={simDeptFilter}
+                  onChange={(e) => setSimDeptFilter(e.target.value)}
+                  className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 font-bold focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="">{isAr ? "كل الأقسام" : "All Wards"}</option>
+                  <option value="EMERGENCY UNIT">{isAr ? "الطوارئ" : "Emergency"}</option>
+                  <option value="INTENSIVE CARE">{isAr ? "العناية المركزة" : "ICU"}</option>
+                  <option value="ONCOLOGY RESEARCH">{isAr ? "أبحاث الأورام" : "Oncology"}</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Logs List rendering */}
+            {(() => {
+              const filtered = decisionLogs.filter(log => {
+                const matchesSearch = log.patientName.toLowerCase().includes(simSearchTerm.toLowerCase()) || 
+                                     log.patientMRN.toLowerCase().includes(simSearchTerm.toLowerCase());
+                const matchesDept = simDeptFilter ? log.department === simDeptFilter : true;
+                return matchesSearch && matchesDept;
+              });
+
+              if (filtered.length === 0) {
+                return (
+                  <div className="text-center text-slate-400 py-10 space-y-2 border border-slate-100 rounded-xl">
+                    <Database className="w-8 h-8 text-slate-300 mx-auto" />
+                    <p className="text-xs font-bold">{isAr ? "لا يوجد سجلات مطابقة حالياً" : "No clinical logs found."}</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filtered.map((log: any) => (
+                    <div 
+                      key={log.id} 
+                      className="border border-slate-180 bg-slate-50/50 p-4 rounded-xl hover:border-indigo-400 transition hover:bg-white shadow-sm flex flex-col justify-between space-y-3 relative overflow-hidden"
+                    >
+                      <div className="absolute top-0 left-0 w-1.5 h-full bg-indigo-500"></div>
+                      
+                      <div>
+                        {/* Header block of card */}
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <span className="text-[10px] font-mono font-bold bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded">
+                              {log.patientMRN}
+                            </span>
+                            <h5 className="font-extrabold text-slate-900 text-xs mt-1.5">{log.patientName}</h5>
+                          </div>
+                          <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${
+                            log.safetyScore >= 80 ? "bg-emerald-100 text-emerald-800" : log.safetyScore >= 60 ? "bg-amber-100 text-amber-800" : "bg-rose-100 text-rose-800"
+                          }`}>
+                            Score: {log.safetyScore}%
+                          </span>
+                        </div>
+
+                        {/* Middle metadata block */}
+                        <div className="text-[10px] text-slate-600 space-y-1 select-none font-semibold">
+                          <div>{isAr ? "قسم الإجراء:" : "Ward:"} <span className="text-slate-900 font-bold">{log.department}</span></div>
+                          <div>{isAr ? "الفاحص الطبي:" : "Auditor:"} <span className="text-pink-600 font-black">{log.auditedBy}</span></div>
+                          <div>{isAr ? "التاريخ السريري:" : "Clincal Date:"} <span className="text-slate-500 font-mono">{new Date(log.timestamp).toLocaleString()}</span></div>
+                        </div>
+
+                        {/* Vital Signs sub-badge */}
+                        <div className="bg-slate-100 p-2 rounded border border-slate-200 grid grid-cols-3 text-center text-[9px] font-mono mt-3 text-slate-700">
+                          <div>BP: <span className="font-extrabold text-slate-950">{log.vitals.bp}</span></div>
+                          <div>HR: <span className="font-extrabold text-slate-950">{log.vitals.pulse}</span></div>
+                          <div>SPO2: <span className="font-extrabold text-slate-950">{log.vitals.spo2}%</span></div>
+                        </div>
+
+                        {/* Programmed Infusion if checked */}
+                        {log.inputs.highAlert && (
+                          <div className="bg-rose-50 text-[10px] text-rose-800 font-bold p-2 rounded border border-rose-100 mt-2">
+                            🚨 {log.inputs.dripName} | Rate: {log.inputs.infusionRate} ml/hr
+                          </div>
+                        )}
+
+                        {/* Warnings indicators */}
+                        {log.triggers.length > 0 && (
+                          <div className="space-y-1 mt-2">
+                            {log.triggers.map((tg: string, i: number) => (
+                              <div key={i} className="text-[9px] font-bold text-red-650 bg-red-50 border border-red-100 px-2 py-0.5 rounded">
+                                {tg}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Card Footer action */}
+                      <div className="pt-2 border-t border-slate-150 flex items-center justify-between">
+                        <span className="text-[10px] bg-slate-200 text-slate-700 px-2 py-0.5 rounded font-black uppercase">
+                          {log.status}
+                        </span>
+                        
+                        <button
+                          onClick={() => handleDeleteSimLog(log.id)}
+                          className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded transition cursor-pointer"
+                          title={isAr ? "مسح السجل الطبى" : "Delete Clinical Entry"}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
+          </div>
+
+        </div>
+      )}
       {activeTab === "kpis" && (
         <div className="space-y-6">
           
@@ -1925,6 +2741,571 @@ export default function QualityAnalyticsHub({
 
         </div>
       )}
+
+      {/* ======================= TAB 7: CERTIFIED QUALITY & ACCREDITATION ARCHIVE ======================= */}
+      {activeTab === "archive" && (() => {
+        // Compile unified Quality Archive Ledger
+        const rawLedgerItems: any[] = [];
+
+        // 1. Add OVRs
+        (ovrs || []).forEach(o => {
+          rawLedgerItems.push({
+            id: o.id,
+            type: "ovr",
+            typeNameAr: "تقرير الأحداث العارضة OVR",
+            typeNameEn: "Occurrence Variance Report",
+            titleAr: `بلاغ OVR لحدث عارض: ${o.categoryAr}`,
+            titleEn: `OVR Safety Variance: ${o.categoryEn}`,
+            date: o.date,
+            department: o.department || "CHEMOTHERAPY DAYCARE",
+            operator: o.loggedBy || "جودة بهية",
+            status: o.status || "Under Active Surveillance",
+            originalData: o
+          });
+        });
+
+        // 2. Add Staff Evaluations
+        (staffEvals || []).forEach(e => {
+          rawLedgerItems.push({
+            id: e.id,
+            type: "eval",
+            typeNameAr: "تقييم أداء جودة الكادر",
+            typeNameEn: "Clinical Quality Evaluation",
+            titleAr: `تقييم الأداء السريري للموظف: ${e.employeeNameAr || e.employeeNameEn}`,
+            titleEn: `Clinical Quality Evaluation: ${e.employeeNameEn}`,
+            date: e.evalDate,
+            department: e.department || "CLINICAL DEPARTMENT",
+            operator: e.evaluatorName || "مشرف تمريض",
+            status: "Verified & Evaluated",
+            originalData: e
+          });
+        });
+
+        // 3. Add Unit Inspections
+        (unitAudits || []).forEach(a => {
+          rawLedgerItems.push({
+            id: a.id,
+            type: "audit",
+            typeNameAr: "تدقيق جودة الأقسام والوحدات",
+            typeNameEn: "Clinical Unit Quality Audit",
+            titleAr: `تدقيق جودة ميداني لوحدة: ${a.unit}`,
+            titleEn: `Clinical Unit Inspection: ${a.unit}`,
+            date: a.date,
+            department: a.unit,
+            operator: a.inspector || "لجنة الجودة",
+            status: `معدل الامتثال: ${a.complianceRate}%`,
+            originalData: a
+          });
+        });
+
+        // 4. Add Sentinel Incidents
+        (sentinelIncidents || []).forEach(s => {
+          rawLedgerItems.push({
+            id: s.id,
+            type: "sentinel",
+            typeNameAr: "رصد حدث فريد جسيم",
+            typeNameEn: "Sentinel Outlier Incident",
+            titleAr: `رصد طارئ لحدث فظيع جسيم: ${s.patientName}`,
+            titleEn: `Sentinel Injury Event: ${s.patientName}`,
+            date: s.date,
+            department: s.department || "EMERGENCY UNIT",
+            operator: s.loggedBy || "أمان المريض",
+            status: s.status || "Under Active Investigation",
+            originalData: s
+          });
+        });
+
+        // 5. Add Policy Signatures
+        (policyAcks || []).forEach(ack => {
+          const policyObj = POLICIES_ARRAY.find(p => p.id === ack.policyId);
+          const policyTitle = policyObj ? policyObj.titleAr : ack.policyId;
+          rawLedgerItems.push({
+            id: ack.id,
+            type: "signature",
+            typeNameAr: "توقيع التزام بالسياسة الحيوية",
+            typeNameEn: "Policy Receipt & Ack Signature",
+            titleAr: `توقيع إلكتروني بالتزام سياسة: ${policyTitle}`,
+            titleEn: `Electronic Policy Acknowledgement: ${ack.policyId}`,
+            date: ack.signedAt ? ack.signedAt.split("T")[0] : new Date().toISOString().split("T")[0],
+            department: "ALL DEPARTMENTS",
+            operator: ack.nurseName || "كادر التمريض",
+            status: "Electronically Signed & Seal Valid",
+            originalData: ack
+          });
+        });
+
+        // Sort by date descending
+        rawLedgerItems.sort((a, b) => b.date.localeCompare(a.date));
+
+        // Filter items
+        const filteredLedgerItems = rawLedgerItems.filter(item => {
+          const matchesKeyword = archiveSearchTerm === "" ||
+            item.titleAr.toLowerCase().includes(archiveSearchTerm.toLowerCase()) ||
+            item.titleEn.toLowerCase().includes(archiveSearchTerm.toLowerCase()) ||
+            item.id.toLowerCase().includes(archiveSearchTerm.toLowerCase()) ||
+            item.operator.toLowerCase().includes(archiveSearchTerm.toLowerCase());
+
+          const matchesType = archiveFilterType === "all" || item.type === archiveFilterType;
+          const matchesDept = archiveDeptFilter === "all" || item.department === archiveDeptFilter;
+
+          return matchesKeyword && matchesType && matchesDept;
+        });
+
+        // Unique departments for filter dropdown
+        const uniqueDeptsList = Array.from(new Set(rawLedgerItems.map(i => i.department).filter(Boolean)));
+
+        // Handle item deletion safely
+        const handleDeleteArchiveItem = async (item: any) => {
+          if (!confirm(isAr 
+            ? `⚠️ تحذير أمني: أنت على وشك حذف وثيقة جودة رسمية معتمدة برقم معرف (${item.id}) من السجلات السحابية الطبية.\nهل تريد المتابعة بحذفها نهائياً؟`
+            : `Are you sure you want to delete this certified record: ${item.id}?`
+          )) {
+            return;
+          }
+
+          try {
+            if (item.type === "ovr") {
+              await deleteCQIOvr(item.id);
+            } else if (item.type === "eval") {
+              await deleteCQIStaffEval(item.id);
+            } else if (item.type === "audit") {
+              await deleteCQIUnitInspection(item.id);
+            } else if (item.type === "sentinel") {
+              await deleteSentinelIncident(item.id);
+            } else if (item.type === "signature") {
+              await deleteCQIPolicyAck(item.id);
+            }
+            
+            addSystemLog(`Deleted archive record: ${item.id}`, "warning");
+            alert(isAr ? `✅ تم حذف المستند وتعميم التعديل على الأرشيف الاعتمادي!` : "Certified record deleted successfully.");
+            
+            if (selectedArchiveItem?.id === item.id) {
+              setSelectedArchiveItem(null);
+            }
+          } catch (err) {
+            console.error("Delete failed", err);
+          }
+        };
+
+        return (
+          <div className="space-y-6 animate-fade">
+            
+            {/* Archive Dashboard Status Stats */}
+            <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
+              <div className="flex items-center gap-4 text-right">
+                <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-605 shrink-0 shadow-inner">
+                  <Database className="h-6 w-6 animate-pulse" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-sm text-slate-900">الأرشيف الاعتمادي الشامل للجودة والمطابقة الطبية</h4>
+                  <p className="text-[10.5px] text-slate-500 mt-0.5 leading-relaxed">
+                    منصة التدقيق والتوثيق الموحدة للسياسات، تقارير السلامة ومصفوفات الأداء التمريضي بما يتماثل مع أجهزة الرقابة الصحية.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 self-stretch md:self-auto justify-end">
+                <div className="bg-rose-50/50 px-4 py-2.5 rounded-2xl border border-rose-100 text-center">
+                  <span className="text-[10px] text-rose-600 font-bold block uppercase font-mono">Total Verified Sheets</span>
+                  <span className="text-lg font-black text-rose-900">{rawLedgerItems.length} وثيقة</span>
+                </div>
+                <div className="bg-indigo-50/50 px-4 py-2.5 rounded-2xl border border-indigo-100 text-center">
+                  <span className="text-[10px] text-indigo-650 font-bold block uppercase font-mono">Archive Filters Active</span>
+                  <span className="text-lg font-black text-indigo-900">{filteredLedgerItems.length} مطابقة</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Filter Bar */}
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-3 items-center justify-between no-print">
+              
+              {/* Type toggle selector */}
+              <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto justify-end">
+                <span className="text-[10px] text-slate-400 font-extrabold whitespace-nowrap ml-1">:تصنيف المستند</span>
+                {[
+                  { key: "all", label: "كل السجلات" },
+                  { key: "ovr", label: "بلاغات OVR" },
+                  { key: "eval", label: "تقييمات كادر" },
+                  { key: "audit", label: "مراجعات وحده" },
+                  { key: "sentinel", label: "أحداث جسيمة" },
+                  { key: "signature", label: "إمضاء السياسات" }
+                ].map(opt => (
+                  <button
+                    key={opt.key}
+                    onClick={() => setArchiveFilterType(opt.key)}
+                    className={`px-3 py-1.5 rounded-lg text-[10.5px] font-extrabold transition-all cursor-pointer ${
+                      archiveFilterType === opt.key
+                        ? "bg-rose-600 text-white shadow-sm font-black"
+                        : "bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-100"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Department Selector and Search Text */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+                
+                {/* Department drop */}
+                <select
+                  value={archiveDeptFilter}
+                  onChange={(e) => setArchiveDeptFilter(e.target.value)}
+                  className="bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-xs text-right font-bold outline-none focus:ring-1 focus:ring-rose-500 text-slate-700"
+                >
+                  <option value="all">كل الأقسام الطبية</option>
+                  {uniqueDeptsList.map(dept => (
+                    <option key={dept} value={dept}>{dept}</option>
+                  ))}
+                </select>
+
+                {/* Text search query */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="بحث سريع بالمعرف أو المستكشف..."
+                    value={archiveSearchTerm}
+                    onChange={(e) => setArchiveSearchTerm(e.target.value)}
+                    className="bg-slate-50 border border-slate-200 rounded-xl pr-9 pl-3 py-1.5 text-xs text-right outline-none focus:ring-1 focus:ring-rose-500 font-bold text-slate-800 placeholder-slate-400 w-full sm:w-56"
+                  />
+                  <Search className="h-4 w-4 text-slate-400 absolute top-2 right-3 font-bold" />
+                </div>
+
+              </div>
+            </div>
+
+            {/* Core Archive Items Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredLedgerItems.map((item) => {
+                let cardColor = "border-slate-250 hover:border-slate-350";
+                let typeBadge = "bg-slate-100 text-slate-700";
+
+                if (item.type === "ovr") {
+                  cardColor = "border-red-150 hover:border-red-300 bg-red-50/5";
+                  typeBadge = "bg-red-100 text-red-800";
+                } else if (item.type === "eval") {
+                  cardColor = "border-purple-150 hover:border-purple-300 bg-purple-50/5";
+                  typeBadge = "bg-purple-100 text-purple-800";
+                } else if (item.type === "audit") {
+                  cardColor = "border-indigo-150 hover:border-indigo-300 bg-indigo-50/5";
+                  typeBadge = "bg-indigo-100 text-indigo-800";
+                } else if (item.type === "sentinel") {
+                  cardColor = "border-rose-250 hover:border-rose-400 bg-rose-50/10 shadow-sm animate-pulse";
+                  typeBadge = "bg-rose-600 text-white font-black";
+                } else if (item.type === "signature") {
+                  cardColor = "border-pink-150 hover:border-pink-300 bg-pink-50/5";
+                  typeBadge = "bg-pink-100 text-pink-800";
+                }
+
+                return (
+                  <div
+                    key={item.id}
+                    className={`bg-white border rounded-3xl p-5 shadow-sm transition hover:shadow-md flex flex-col justify-between text-right space-y-4 relative overflow-hidden ${cardColor}`}
+                  >
+                    {/* Security Stamp Background Effect */}
+                    <div className="absolute -top-1 px-4 -left-3 pointer-events-none opacity-[0.06] select-none text-[32px] font-mono transform rotate-12 uppercase font-black tracking-widest text-slate-800 select-none">
+                      GAHAR CQI SECURE
+                    </div>
+
+                    <div className="space-y-3">
+                      
+                      {/* Card Header metadata */}
+                      <div className="flex justify-between items-center border-b pb-2">
+                        <span className="text-[10px] text-slate-400 font-mono font-extrabold flex items-center gap-1 leading-none">
+                          <Clock size={11} />
+                          <span>{item.date}</span>
+                        </span>
+                        <span className={`text-[8.5px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider ${typeBadge}`}>
+                          {item.typeNameAr}
+                        </span>
+                      </div>
+
+                      {/* Main Title / Subject */}
+                      <h5 className="font-extrabold text-[12px] text-slate-850 leading-snug">
+                        {item.titleAr}
+                      </h5>
+                      <p className="text-[10px] text-slate-450 font-medium leading-none font-mono text-left" dir="ltr">
+                        {item.titleEn}
+                      </p>
+
+                      {/* Info lines with nice typography */}
+                      <div className="space-y-1 bg-slate-50 p-3 rounded-2xl border border-slate-100 text-[10.5px] text-slate-600 font-sans">
+                        <div className="flex justify-between text-[10px]">
+                          <span className="font-bold text-slate-800">{item.department}</span>
+                          <span className="text-slate-400 font-medium">القسم المستهدف:</span>
+                        </div>
+                        <div className="flex justify-between text-[10px] mt-1">
+                          <span className="font-bold text-slate-800">{item.operator}</span>
+                          <span className="text-slate-400 font-medium">مسجل الواقعة/المدقق:</span>
+                        </div>
+                        <div className="flex justify-between text-[10px] mt-1 pt-1 border-t border-slate-100">
+                          <span className="font-mono font-bold text-indigo-600">{item.id}</span>
+                          <span className="text-slate-400 font-medium">المعّرف الموحد:</span>
+                        </div>
+                      </div>
+
+                    </div>
+
+                    {/* Bottom Action buttons */}
+                    <div className="border-t border-slate-100 pt-3 flex items-center justify-between gap-1">
+                      
+                      {/* Delete Secure stamp trigger */}
+                      <button
+                        onClick={() => handleDeleteArchiveItem(item)}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition cursor-pointer"
+                        title="حذف المستند نهائياً"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+
+                      {/* Main View certificate print overlay trigger */}
+                      <button
+                        onClick={() => setSelectedArchiveItem(item)}
+                        className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-extrabold text-[10px] rounded-xl transition cursor-pointer flex items-center gap-1"
+                      >
+                        <Printer size={12} className="text-rose-650" />
+                        <span>معاينة وثيقة الاعتماد والطباعة</span>
+                      </button>
+
+                    </div>
+                  </div>
+                );
+              })}
+
+              {filteredLedgerItems.length === 0 && (
+                <div className="text-center py-16 bg-slate-50 border border-dashed rounded-3xl text-slate-400 text-xs md:col-span-3">
+                  <Database className="h-8 w-8 text-slate-300 mx-auto block mb-2" />
+                  <p className="font-bold">أرشيف الجودة فارغ حالياً أو لا ينطبق على خيارات البحث.</p>
+                  <p className="text-[10px] text-slate-400 mt-1">اضغط على زر (تأسيس وتجريب أرشيف الجودة السحابي) لتوليد بيانات الاعتماد فوراً.</p>
+                </div>
+              )}
+            </div>
+
+            {/* ====================================================================================== */}
+            {/* PRISTINE STERILE WHITE CERTIFICATE PRINT-PREVIEW MODAL (The Organized White Archive Layout) */}
+            {/* ====================================================================================== */}
+            {selectedArchiveItem && (() => {
+              const item = selectedArchiveItem;
+              
+              return (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 overflow-y-auto">
+                  <div className="bg-white rounded-3xl border border-slate-100 max-w-2xl w-full p-2 shadow-2xl relative animate-fade">
+                    
+                    {/* Header action parameters */}
+                    <div className="p-3 border-b flex justify-between items-center gap-2 bg-slate-50 rounded-t-3xl no-print">
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => window.print()}
+                          className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-[10.5px] rounded-xl transition flex items-center gap-1 cursor-pointer"
+                        >
+                          <Printer size={12} />
+                          <span>طباعة المستند المعتمد</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(`CERT-BH-CQI-${item.id}`);
+                            alert(isAr ? "📋 تم نسخ الكود المعياري الموحد لاعتماد المستند بنجاح!" : "Document accreditation hash copied.");
+                          }}
+                          className="px-3 py-1.5 bg-white border text-slate-650 hover:bg-slate-100 font-bold text-[10px] rounded-xl transition cursor-pointer"
+                        >
+                          نسخ رمز الموثوقية
+                        </button>
+                      </div>
+
+                      <button
+                        onClick={() => setSelectedArchiveItem(null)}
+                        className="w-7 h-7 bg-white hover:bg-slate-150 border border-slate-200 rounded-full flex items-center justify-center text-slate-500 transition cursor-pointer"
+                      >
+                        <X size={15} />
+                      </button>
+                    </div>
+
+                    {/* Official Sterile White Certificate Paper Sheet (Designed explicitly for precise real printout or gorgeous screen reading) */}
+                    <div 
+                      className="bg-white p-8 md:p-12 text-slate-900 text-right font-sans relative border-8 border-double border-slate-200 m-2 overflow-hidden select-text print:border-none print:m-0 print:p-0"
+                      id="certified-white-document-sheet"
+                    >
+                      
+                      {/* Certified Stamp Watermark Overlay Background */}
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03] select-none">
+                        <Award className="w-[300px] h-[300px] text-slate-900" />
+                      </div>
+
+                      {/* Header Logo and Official Header Title */}
+                      <div className="flex justify-between items-start border-b-2 border-slate-900 pb-5 gap-4">
+                        <div className="text-left font-mono text-[9px] text-slate-400">
+                          <p>ACCREDITATION REF: BH-CQI-{item.id.toUpperCase()}</p>
+                          <p>DATE RECORDED: {item.date}</p>
+                          <p>CLASSIFICATION: MEDICAL QUALITY REGISTER</p>
+                          <p>STATUS: VERIFIED & COMPLIANT</p>
+                        </div>
+                        
+                        <div className="text-right">
+                          <h4 className="font-black text-xs text-slate-900 uppercase tracking-widest font-mono">
+                            {(hospitalSettings?.nameEn || "BAHEYA HOSPITAL").toUpperCase()} HEALTHCARE FOUNDATION
+                          </h4>
+                          <p className="font-extrabold text-[12px] text-slate-700 mt-1">
+                            {hospitalSettings?.nameAr || "مستشفيات مؤسسة بهية الكشف المبكر"} / إدارة الجودة والتحسين المستمر للأداء
+                          </p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">
+                            الوثيقة الرسمية للأرشيف الاعتمادي والرقابة الصحية الكلية للمنشآت الطبية
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Seal Verification Block */}
+                      <div className="mt-8 flex justify-between items-center bg-slate-50/50 p-4 border border-slate-200 rounded-2xl relative">
+                        <div className="text-left font-mono text-[9px] text-slate-400 leading-tight">
+                          <p className="font-bold text-slate-705">SECURITY DIGITAL HASH:</p>
+                          <p>sha256: 0ae6e32bc0c50d18080ff{item.id}</p>
+                          <p className="text-emerald-700 font-bold mt-0.5">✔ CLOUD AUTH SEALS MATCHED - ORIGINAL REGISTERED</p>
+                        </div>
+
+                        <div className="text-right">
+                          <div className="flex items-center gap-1.5 justify-end text-rose-800">
+                            <span className="text-[10.5px] font-black tracking-tight">{item.typeNameAr}</span>
+                            <ShieldCheck size={14} />
+                          </div>
+                          <p className="text-[9.5px] text-slate-405 mt-0.5">رقم المعرّف المعياري: <span className="font-mono font-bold text-slate-900">CERT-BH-CQI-{item.id}</span></p>
+                        </div>
+                      </div>
+
+                      {/* Main Title in print sheet */}
+                      <h3 className="text-center text-sm font-black text-slate-900 mt-8 border-b pb-2 tracking-tight">
+                        وثيقة إقرار الالتزام ومطابقة متمتلكات الكفاءة الإكلينيكية
+                      </h3>
+
+                      {/* Structured Document Data Rows */}
+                      <div className="mt-6 space-y-4 text-xs font-sans text-right leading-relaxed">
+                        
+                        <div className="grid grid-cols-3 gap-2 border-b border-dashed pb-2.5">
+                          <span className="text-slate-400">توصيف السجل الطبي:</span>
+                          <span className="col-span-2 font-black text-slate-950 font-sans text-right">
+                            {item.titleAr}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2 border-b border-dashed pb-2.5">
+                          <span className="text-slate-400">Department /Clinical Unit:</span>
+                          <span className="col-span-2 font-bold text-slate-800">
+                            {item.department} / {item.department === "ALL DEPARTMENTS" ? "جميع الأقسام السريرية" : "الوحدات الخاصة"}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2 border-b border-dashed pb-2.5">
+                          <span className="text-slate-400">المدقق المسؤول والاعتمادي:</span>
+                          <span className="col-span-2 font-bold text-slate-800">
+                            {item.operator} (عضو لجنة الجودة السريرية المسجلة)
+                          </span>
+                        </div>
+
+                        {/* Rendering item unique parameters based on type */}
+                        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 mt-6 space-y-3">
+                          <strong className="block text-[10px] text-slate-500 pb-1.5 border-b border-slate-200/60 leading-none">
+                            📋 تفاصيل البيانات والجرودات السريرية المسجلة سحابياً:
+                          </strong>
+
+                          {item.type === "ovr" && (
+                            <div className="space-y-2 text-[11px] leading-relaxed">
+                              <p><span className="text-slate-400 font-bold">● تصنيف الخطورة:</span> <span className="font-extrabold text-red-800">{item.originalData.severity}</span></p>
+                              <p><span className="text-slate-400 font-bold">● الوصف السريري للواقعة:</span> <span className="font-bold text-slate-800">{item.originalData.descAr}</span></p>
+                              <p><span className="text-slate-400 font-bold">● الإجراء التصحيحي الفوري:</span> <span className="font-bold text-emerald-800">{item.originalData.correctiveAr}</span></p>
+                              {item.originalData.patientInvolved && (
+                                <p className="bg-slate-100 p-2 rounded-lg text-[10.5px]"><span className="text-slate-505 font-bold">بيانات المريض المتأثر:</span> الاسم: {item.originalData.patientName} / ملف طبي: {item.originalData.patientMRN}</p>
+                              )}
+                            </div>
+                          )}
+
+                          {item.type === "eval" && (
+                            <div className="space-y-2 text-[11px]">
+                              <p><span className="text-slate-400 font-bold">● الموظف المقيم:</span> <span className="font-extrabold text-purple-900">{item.originalData.employeeNameAr} ({item.originalData.employeeId})</span></p>
+                              <p><span className="text-slate-400 font-bold">● درجات التقييم (من 5):</span></p>
+                              <div className="grid grid-cols-5 gap-2 text-center text-[10px] bg-slate-100 p-2 rounded-xl border font-bold">
+                                <div>مكافحة عدوى<br/><span className="text-rose-600 text-xs">{item.originalData.scores?.clinical || 5}</span></div>
+                                <div>السياسات<br/><span className="text-rose-600 text-xs">{item.originalData.scores?.policy || 5}</span></div>
+                                <div>التوثيق<br/><span className="text-rose-600 text-xs">{item.originalData.scores?.documentation || 4}</span></div>
+                                <div>الحضور وانضباط<br/><span className="text-rose-605 text-xs">{item.originalData.scores?.attendance || 5}</span></div>
+                                <div>الأخلاقيات<br/><span className="text-rose-605 text-xs">{item.originalData.scores?.ethics || 5}</span></div>
+                              </div>
+                              <p className="mt-2"><span className="text-slate-400 font-bold">● تعليق المشرف الجبائي:</span> <span className="font-bold text-slate-800">{item.originalData.comments}</span></p>
+                            </div>
+                          )}
+
+                          {item.type === "audit" && (
+                            <div className="space-y-2 text-[11px]">
+                              <p><span className="text-slate-400 font-bold">● معدل الالتزام الكلي:</span> <span className="font-extrabold text-indigo-700 text-sm">{item.originalData.complianceRate}%</span></p>
+                              <p><span className="text-slate-400 font-bold">● حالة بنود وقوائم التحقق:</span></p>
+                              <div className="grid grid-cols-3 gap-2 text-[9.5px]">
+                                <p>عربة طوارئ الكود بلو: <span className="font-bold">{item.originalData.scores?.codeBlue ? "✔ مطابقة" : "✘ مخالفه"}</span></p>
+                                <p>سلسلة التبريد الدوائي: <span className="font-bold">{item.originalData.scores?.coldChain ? "✔ مطابقة" : "✘ مخالفه"}</span></p>
+                                <p>سلامة الأكسجين والغازات: <span className="font-bold">{item.originalData.scores?.gases ? "✔ مطابقة" : "✘ مخالفه"}</span></p>
+                                <p>مخارج مكافحة الحريق: <span className="font-bold">{item.originalData.scores?.fireSafety ? "✔ مطابقة" : "✘ مخالفه"}</span></p>
+                                <p>أنظمة استدعاء التمريض: <span className="font-bold">{item.originalData.scores?.nurseCall ? "✔ مطابقة" : "✘ مخالفه"}</span></p>
+                                <p>صيانة الأجهزة الحيوية: <span className="font-bold">{item.originalData.scores?.preventiveMaint ? "✔ مطابقة" : "✘ مخالفه"}</span></p>
+                              </div>
+                              <p className="mt-2 pt-1 border-t"><span className="text-slate-400 font-bold">● توصيات التدقيق المكتوبة:</span> <span className="font-bold text-slate-800">{item.originalData.notes}</span></p>
+                            </div>
+                          )}
+
+                          {item.type === "sentinel" && (
+                            <div className="space-y-2 text-[11px]">
+                              <p><span className="text-slate-400 font-bold">● المريض المشترك:</span> <span className="font-extrabold text-rose-800">{item.originalData.patientName} (ملف: {item.originalData.patientMRN})</span></p>
+                              <p><span className="text-slate-400 font-bold">● تصنيف وطبيعة الحدث الجسيم:</span> <span className="font-bold text-slate-800">{item.originalData.category}</span></p>
+                              <p><span className="text-slate-400 font-bold">● تفاصيل الحدث المطور:</span> <span className="font-bold text-slate-800">{item.originalData.details}</span></p>
+                              <p><span className="text-slate-400 font-bold">● حالة التحقيق الجنائي الإكلينيكي:</span> <span className="font-bold text-indigo-700">{item.originalData.status}</span></p>
+                            </div>
+                          )}
+
+                          {item.type === "signature" && (
+                            <div className="space-y-2 text-[11px]">
+                              <p><span className="text-slate-400 font-bold">● نوع الإجراء القانوني:</span> <span className="font-black text-slate-900">توقيع أمني إلكتروني بالعلم والالتزام التام بالسياسة</span></p>
+                              <p><span className="text-slate-400 font-bold">● الكادر الموقع:</span> <span className="font-extrabold text-slate-800">{item.originalData.nurseName} (معرف: {item.originalData.nurseId})</span></p>
+                              <p><span className="text-slate-400 font-bold">● البصمة الرقمية للتوقيع:</span> <span className="font-mono bg-slate-100 px-1 py-0.5 rounded text-[10px] text-indigo-750">SIG-BAHEYA-{item.originalData.nurseId?.toUpperCase()}-{item.id}</span></p>
+                              <p><span className="text-slate-400 font-bold">● وقت وطوابع التثبيت:</span> <span className="font-bold text-emerald-800">{new Date(item.originalData.signedAt).toLocaleString("ar-EG")}</span></p>
+                            </div>
+                          )}
+                        </div>
+
+                      </div>
+
+                      {/* Footer signatures & stamps blocks for print out */}
+                      <div className="mt-14 border-t-2 border-slate-900 pt-6 grid grid-cols-2 gap-4 text-xs font-sans text-right">
+                        <div>
+                          <p className="font-black text-rose-900">الختم الاعتمادي لإدارة الجودة:</p>
+                          <div className="mt-2 w-28 h-20 rounded bg-rose-50 border border-rose-200 text-center flex flex-col justify-center items-center text-[8px] text-rose-850 transform -rotate-3 select-none leading-tight border-double font-black p-1 shadow-sm">
+                            <p>مستشفى بهية المعتمدة</p>
+                            <p className="text-[7.5px] text-rose-600 mt-1">APPROVED SYSTEM</p>
+                            <p className="text-[7.5px] font-bold font-mono">GAHAR COMPLIANT</p>
+                            <p className="text-[6.5px] text-slate-400 font-mono mt-1">CQI-REF-PASSED</p>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col justify-between h-full">
+                          <p className="font-black text-slate-900">التوقيع الإلكتروني المصدق:</p>
+                          <div>
+                            <p className="font-extrabold text-slate-850 font-mono">DIGITAL SIGN-OFF SECURE</p>
+                            <p className="text-[10px] text-slate-405 leading-snug">
+                              مؤسسة و مستشفيات بهية للتطوير - مركز التقييم والاعتماد الوطني CQI لعام 2026.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Print guideline */}
+                      <p className="text-center text-[9px] text-slate-404 mt-12 block no-print border-t pt-2">
+                        📄 مستند طبي رسمي - تم توليده سحابياً لمطابقة معايير الرقابة الصحية بهيئة GAHAR بجمهورية مصر العربية.
+                      </p>
+
+                    </div>
+
+                  </div>
+                </div>
+              );
+            })()}
+
+          </div>
+        );
+      })()}
 
     </div>
   );

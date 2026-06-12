@@ -3,11 +3,31 @@ import {
   ClipboardCheck, FileText, Activity, Calculator, HeartPulse, 
   Syringe, Pill, Thermometer, UserCheck, Stethoscope, 
   Baby, Settings, CheckSquare, Droplet, Clock, 
-  ShieldAlert, Files, Dna, Key, Wrench, ListTodo, X, Printer, Copy, CheckCircle
+  ShieldAlert, Files, Dna, Key, Wrench, ListTodo, X, Printer, Copy, CheckCircle,
+  Database, Trash2, RefreshCw
 } from "lucide-react";
+import { 
+  collection, 
+  addDoc, 
+  getDocs, 
+  query, 
+  orderBy, 
+  limit, 
+  deleteDoc, 
+  doc 
+} from "firebase/firestore";
+import { db } from "../lib/firebase";
 
 interface NursingAdminToolboxProps {
   language: "ar" | "en";
+  currentUser?: {
+    id: string;
+    nameAr: string;
+    nameEn: string;
+    role: string;
+    department?: string;
+    email?: string;
+  };
 }
 
 // Full 50 Tools definitions with schema-driven interaction modes
@@ -68,10 +88,47 @@ const NURSING_TOOLS = [
   { id: 50, type: "CALC", nameAr: "ساعات التعليم CME", nameEn: "CME Tracker", icon: Clock, color: "bg-amber-50 text-amber-600" }
 ];
 
-export default function NursingAdminToolbox({ language }: NursingAdminToolboxProps) {
+export default function NursingAdminToolbox({ language, currentUser }: NursingAdminToolboxProps) {
   const isAr = language === "ar";
   const [tasks, setTasks] = useState<{ id: number; text: string; done: boolean }[]>([]);
   const [taskInput, setTaskInput] = useState("");
+
+  // Sub tab and archive states
+  const [activeSubTab, setActiveSubTab] = useState<"library" | "archive">("library");
+  const [archiveList, setArchiveList] = useState<any[]>([]);
+  const [archiveLoading, setArchiveLoading] = useState(false);
+
+  const fetchArchive = async () => {
+    setArchiveLoading(true);
+    try {
+      const q = query(collection(db, "nursing_tool_archive"), orderBy("createdAt", "desc"), limit(100));
+      const querySnapshot = await getDocs(q);
+      const list: any[] = [];
+      querySnapshot.forEach((docSnap) => {
+        list.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      setArchiveList(list);
+    } catch (e) {
+      console.error("Error loading archive from firestore: ", e);
+    } finally {
+      setArchiveLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchArchive();
+  }, []);
+
+  const handleDeleteRecord = async (recordId: string) => {
+    try {
+      await deleteDoc(doc(db, "nursing_tool_archive", recordId));
+      triggerToast(isAr ? "تم حذف السجل من الحفظ والأرشيف بنجاح!" : "Log deleted from persistent archive!");
+      fetchArchive();
+    } catch (e) {
+      console.error(e);
+      triggerToast(isAr ? "عذراً، فشل حذف السجل" : "Failed to erase archive log");
+    }
+  };
 
   // Search filter
   const [toolSearch, setToolSearch] = useState("");
@@ -891,6 +948,82 @@ export default function NursingAdminToolbox({ language }: NursingAdminToolboxPro
     return null;
   };
 
+  const handleSaveReport = async () => {
+    if (!selectedTool) return;
+    try {
+      let outputText = "";
+      let savedInputs: any = {};
+
+      if (selectedTool.type === "CALC") {
+        const results = getCalcResults(selectedTool.id);
+        outputText = results.display + " - " + (isAr ? results.descAr : results.descEn);
+        savedInputs = { ...calcInputs };
+      } else if (selectedTool.type === "SCALE") {
+        const results = calculateTotalScaleScore(selectedTool.id);
+        outputText = `${results.total} Points (${isAr ? results.interpretAr : results.interpretEn})`;
+        const selectedAnswers: Record<string, number> = {};
+        const config = getScaleConfig(selectedTool.id);
+        config.categories.forEach((cat) => {
+          const key = `${selectedTool.id}_${cat.key}`;
+          if (scaleSelections[key] !== undefined) {
+            selectedAnswers[cat.key] = scaleSelections[key];
+          }
+        });
+        savedInputs = selectedAnswers;
+      } else if (selectedTool.type === "CHECKLIST") {
+        const items = getChecklistItems(selectedTool.id);
+        const isDone = isChecklistCompleted(selectedTool.id);
+        outputText = isDone 
+          ? (isAr ? "مكتمل التدقيق بالكامل وسليم" : "All audit checkpoints passed")
+          : (isAr ? "تدقيق غير مكتمل" : "Incomplete audit checkpoints");
+        
+        const checkedKeys: Record<string, boolean> = {};
+        items.forEach(item => {
+          checkedKeys[item.key] = !!checkedItems[`${selectedTool.id}_${item.key}`];
+        });
+        savedInputs = checkedKeys;
+      } else if (selectedTool.type === "FORM") {
+        outputText = isAr 
+          ? "تم تعبئة الاستمارة وحفظها إلكترونياً بنجاح بالملف الطبي"
+          : "Form document populated and committed to medical chart";
+        savedInputs = { ...formInputs };
+      }
+
+      const nurseInfo = currentUser || {
+        id: "emp-manual",
+        nameAr: "أ. فاطمة الزهراء (استاف التمريض)",
+        nameEn: "Fatma Al-Zahraa (Nursing Staff)",
+        role: "staff",
+        department: "EMERGENCY UNIT"
+      };
+
+      const record = {
+        toolId: selectedTool.id,
+        toolNameAr: selectedTool.nameAr,
+        toolNameEn: selectedTool.nameEn,
+        toolType: selectedTool.type,
+        savedBy: {
+          id: nurseInfo.id,
+          nameAr: nurseInfo.nameAr,
+          nameEn: nurseInfo.nameEn,
+          role: nurseInfo.role,
+          department: nurseInfo.department || "GENERAL WARD"
+        },
+        inputs: savedInputs,
+        output: outputText,
+        createdAt: new Date().toISOString()
+      };
+
+      await addDoc(collection(db, "nursing_tool_archive"), record);
+      triggerToast(isAr ? "تم حفظ النتيجة وتوثيق السجل في الأرشيف بنجاح!" : "Saved telemetry results and logged in Archive successfully!");
+      fetchArchive();
+      setSelectedTool(null);
+    } catch (e) {
+      console.error("Error saving tool check", e);
+      triggerToast(isAr ? "خطأ أثناء الحفظ بقاعدة البيانات" : "Error saving to cloud database");
+    }
+  };
+
   const handlePrint = () => {
     window.print();
     triggerToast(isAr ? "جاري تجهيز الاستمارة وأمر الطباعة للجرس..." : "Sending form format to paper printer...");
@@ -977,60 +1110,257 @@ export default function NursingAdminToolbox({ language }: NursingAdminToolboxPro
         />
       </div>
 
-      {/* Grid of 50 Tools */}
-      <div className="pt-4 space-y-4">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Settings className="w-5 h-5 text-pink-600" />
-            <h3 className="text-lg font-black text-slate-800 tracking-tight">{isAr ? "مكتبة أدوات ونماذج التمريض (50 أداة تفاعلية)" : "Nursing Tools & Forms Library (50 Interactive Tools)"}</h3>
-          </div>
+      {/* Sub-Navigation Tabs for Library vs Archive logs */}
+      <div className="flex border-b border-slate-200">
+        <button 
+          onClick={() => setActiveSubTab("library")}
+          className={`px-6 py-3 font-extrabold text-sm transition-all border-b-2 flex items-center gap-2 ${
+            activeSubTab === "library" 
+              ? "border-pink-600 text-pink-600" 
+              : "border-transparent text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          <Settings className="w-4 h-4" />
+          {isAr ? "مكتبة الأدوات التفاعلية (50 أداة وتطبيق)" : "Interactive Tools Library (50 Tools)"}
+        </button>
 
-          {/* Quick Search bar */}
-          <div className="w-full md:w-64">
-            <input 
-              type="text"
-              value={toolSearch}
-              onChange={e => setToolSearch(e.target.value)}
-              className="w-full border border-slate-200 bg-white focus:ring-2 focus:ring-pink-500 outline-none p-2 rounded-xl text-xs font-semibold text-right"
-              placeholder={isAr ? "البحث برقم الأداة أو اسمها..." : "Search by tool # or title..."}
-            />
+        <button 
+          onClick={() => {
+            setActiveSubTab("archive");
+            fetchArchive();
+          }}
+          className={`px-6 py-3 font-extrabold text-sm transition-all border-b-2 flex items-center gap-2 ${
+            activeSubTab === "archive" 
+              ? "border-pink-600 text-pink-600" 
+              : "border-transparent text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          <Database className="w-4 h-4" />
+          {isAr ? "أرشيف السجلات والتدقيق السريري الآمن 🔒" : "Secure Clinical SBAR & Calc Archive 🔒"}
+          {archiveList.length > 0 && (
+            <span className="bg-pink-100 text-pink-700 text-[10px] px-1.5 py-0.5 rounded-full font-black">
+              {archiveList.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {activeSubTab === "library" ? (
+        /* Grid of 50 Tools */
+        <div className="pt-4 space-y-4">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <Settings className="w-5 h-5 text-pink-600" />
+              <h3 className="text-lg font-black text-slate-800 tracking-tight">{isAr ? "مكتبة أدوات ونماذج التمريض (50 أداة تفاعلية)" : "Nursing Tools & Forms Library (50 Interactive Tools)"}</h3>
+            </div>
+
+            {/* Quick Search bar */}
+            <div className="w-full md:w-64">
+              <input 
+                type="text"
+                value={toolSearch}
+                onChange={e => setToolSearch(e.target.value)}
+                className="w-full border border-slate-200 bg-white focus:ring-2 focus:ring-pink-500 outline-none p-2 rounded-xl text-xs font-semibold text-right"
+                placeholder={isAr ? "البحث برقم الأداة أو اسمها..." : "Search by tool # or title..."}
+              />
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 lg:gap-4 pb-12">
+            {filteredTools.map((tool) => {
+              const IconComponent = tool.icon;
+              return (
+                <button 
+                  key={tool.id} 
+                  onClick={() => setSelectedTool(tool)}
+                  className="group relative flex flex-col items-center justify-center gap-3 p-4 bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-slate-300 hover:-translate-y-0.5 transition-all outline-none focus:ring-2 focus:ring-pink-500 text-center"
+                >
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${tool.color}`}>
+                    <IconComponent className="w-6 h-6" />
+                  </div>
+                  <span className="text-[11px] font-black text-slate-700 leading-tight">
+                    {isAr ? tool.nameAr : tool.nameEn}
+                  </span>
+
+                  <span className="text-[9px] font-mono font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full mt-1">
+                    {tool.type === "CALC" ? (isAr ? "حاسبة" : "Calculator") : 
+                     tool.type === "SCALE" ? (isAr ? "تقييم درجات" : "Scale Metric") : 
+                     tool.type === "CHECKLIST" ? (isAr ? "بروتوكول" : "Checklist") : (isAr ? "استمارة" : "Form Builder")}
+                  </span>
+                  
+                  {/* Decorative tool number */}
+                  <span className="absolute top-2 right-2 text-[8px] font-mono font-black text-slate-300">
+                    #{tool.id}
+                  </span>
+                </button>
+              )
+            })}
+            {filteredTools.length === 0 && (
+              <p className="col-span-full text-center text-xs text-slate-400 font-bold py-6 italic">{isAr ? "لا توجد أدوات مطابقة لبحثك." : "No nursing tools match your query."}</p>
+            )}
           </div>
         </div>
-        
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 lg:gap-4 pb-12">
-          {filteredTools.map((tool) => {
-            const IconComponent = tool.icon;
-            return (
-              <button 
-                key={tool.id} 
-                onClick={() => setSelectedTool(tool)}
-                className="group relative flex flex-col items-center justify-center gap-3 p-4 bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-slate-300 hover:-translate-y-0.5 transition-all outline-none focus:ring-2 focus:ring-pink-500 text-center"
-              >
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${tool.color}`}>
-                  <IconComponent className="w-6 h-6" />
-                </div>
-                <span className="text-[11px] font-black text-slate-700 leading-tight">
-                  {isAr ? tool.nameAr : tool.nameEn}
-                </span>
+      ) : (
+        /* Real-time Cloud SQL / Firestore Archive logs */
+        <div className="space-y-4">
+          <div className="bg-slate-50 border border-slate-200/60 p-5 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="text-right">
+              <h4 className="font-extrabold text-slate-800 text-sm flex items-center gap-1.5 justify-end">
+                <span>{isAr ? "مستودع السجلات الطبية الآمن ومطابقة الضوابط" : "Secure Electronic Clinical Telemetry Archival"}</span>
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+              </h4>
+              <p className="text-[10px] text-slate-500 mt-1 font-bold">
+                {isAr 
+                  ? "تتحفظ كافة نتائج فحص المرضى والتقييمات تلقائياً في قاعدة بيانات Firestore السحابية لمستشفى باهية." 
+                  : "All computed checklists, scales, and dosage parameters are written directly to Cloud Firestore."}
+              </p>
+              <div className="text-[9px] font-mono font-bold text-slate-600 bg-slate-100 rounded-lg py-1 px-3 mt-1 inline-block">
+                Firestore Collection: <span className="text-pink-600 font-black">nursing_tool_archive</span>
+              </div>
+            </div>
 
-                <span className="text-[9px] font-mono font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full mt-1">
-                  {tool.type === "CALC" ? (isAr ? "حاسبة" : "Calculator") : 
-                   tool.type === "SCALE" ? (isAr ? "تقييم درجات" : "Scale Metric") : 
-                   tool.type === "CHECKLIST" ? (isAr ? "بروتوكول" : "Checklist") : (isAr ? "استمارة" : "Form Builder")}
-                </span>
-                
-                {/* Decorative tool number */}
-                <span className="absolute top-2 right-2 text-[8px] font-mono font-black text-slate-300">
-                  #{tool.id}
-                </span>
-              </button>
-            )
-          })}
-          {filteredTools.length === 0 && (
-            <p className="col-span-full text-center text-xs text-slate-400 font-bold py-6 italic">{isAr ? "لا توجد أدوات مطابقة لبحثك." : "No nursing tools match your query."}</p>
+            <button
+              onClick={fetchArchive}
+              disabled={archiveLoading}
+              className="flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs rounded-xl shadow-xs transition-all disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${archiveLoading ? "animate-spin text-pink-600" : ""}`} />
+              <span>{isAr ? "تحديث السجلات" : "Refresh Logs"}</span>
+            </button>
+          </div>
+
+          {archiveLoading && archiveList.length === 0 ? (
+            <div className="py-20 text-center">
+              <RefreshCw className="w-8 h-8 text-pink-600 animate-spin mx-auto" />
+              <p className="text-xs font-bold text-slate-500 mt-2">{isAr ? "جاري تحميل الأرشيف الطبي الفعلي..." : "Loading clinical archive registry..."}</p>
+            </div>
+          ) : archiveList.length === 0 ? (
+            <div className="py-16 text-center bg-white border border-dashed border-slate-200 rounded-2xl">
+              <Database className="w-12 h-12 text-slate-300 mx-auto stroke-[1.5]" />
+              <p className="text-xs font-black text-slate-500 mt-3">{isAr ? "الأرشيف فارغ حالياً" : "The Clinical Archive is currently empty."}</p>
+              <p className="text-[10px] text-slate-400 mt-1 font-medium">{isAr ? "افتح أي أداة من المكتبة، ثم اضغط على 'حفظ وتوثيق التقرير بالأرشيف' لتوثيق فحص حقيقي." : "Open any interactive tool, key in values, and click Save & Archive."}</p>
+            </div>
+          ) : (
+            <div className="space-y-3 pb-12">
+              {archiveList.map((rec) => (
+                <div key={rec.id} className="bg-white border border-slate-100 rounded-2xl p-4 shadow-xs relative hover:border-slate-300 transition-all text-right flex flex-col md:flex-row justify-between gap-4">
+                  {/* Left Info: Tool and Output result */}
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center gap-2 justify-end">
+                      <span className="text-[10px] font-mono font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+                        #{rec.toolId}
+                      </span>
+                      <span className="text-[10px] font-bold bg-pink-50 text-pink-700 px-2 py-0.5 rounded-full font-mono uppercase">
+                        {rec.toolType}
+                      </span>
+                      <h5 className="font-extrabold text-slate-800 text-xs text-right">
+                        {isAr ? rec.toolNameAr : rec.toolNameEn}
+                      </h5>
+                    </div>
+
+                    <div className="bg-slate-50/60 p-3 rounded-xl border border-slate-100">
+                      <p className="text-xs font-black text-slate-800 leading-relaxed text-right md:-mr-1 flex items-center justify-end gap-1.5">
+                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full shrink-0" />
+                        <span>{rec.output || "-"}</span>
+                      </p>
+                      
+                      {rec.inputs && Object.keys(rec.inputs).length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-slate-200/50 flex flex-wrap gap-2 justify-end">
+                          {Object.entries(rec.inputs).map(([k, v]: [string, any]) => (
+                            <span key={k} className="text-[9px] font-mono font-extrabold text-slate-500 bg-white border border-slate-100/80 rounded-md px-1.5 py-0.5">
+                              {k}: <strong className="text-slate-800 font-bold">{String(v)}</strong>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right metadata profile & action buttons */}
+                  <div className="flex flex-col justify-between items-end gap-2 md:w-56 shrink-0 md:border-r md:pr-4 md:border-slate-100">
+                    <div className="text-right">
+                      <div className="text-[10px] font-black text-slate-700 flex items-center gap-1 justify-end">
+                        <span>{isAr ? rec.savedBy?.nameAr : rec.savedBy?.nameEn}</span>
+                        <div className="w-5 h-5 rounded-full bg-pink-100 text-[9px] text-pink-700 font-black flex items-center justify-center">
+                          {rec.savedBy?.avatarInitials || (rec.savedBy?.nameEn || "N").slice(0, 2).toUpperCase()}
+                        </div>
+                      </div>
+                      <div className="text-[9px] text-slate-400 font-bold mt-0.5">
+                        {isAr ? "القسم: " : "Dept: "} {rec.savedBy?.department || "EMERGENCY UNIT"}
+                      </div>
+                      <div className="text-[9px] text-slate-400 font-bold">
+                        {isAr ? "الدور: " : "Role: "} {rec.savedBy?.role || "staff"}
+                      </div>
+                      <div className="text-[9px] font-mono text-slate-500 mt-1">
+                        {new Date(rec.createdAt).toLocaleString(isAr ? "ar-EG" : "en-US", {
+                          year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="flex gap-1.5 w-full justify-end mt-2 md:mt-0">
+                      <button
+                        onClick={() => {
+                          const w = window.open("", "_blank");
+                          if (w) {
+                            w.document.write(`
+                              <html>
+                                <head>
+                                  <title>Report - Tool #${rec.toolId}</title>
+                                  <style>
+                                    body { font-family: sans-serif; padding: 40px; text-align: right; direction: ${isAr ? "rtl" : "ltr"}; }
+                                    .header { border-bottom: 2px solid #e11d48; padding-bottom: 10px; margin-bottom: 20px; }
+                                    .title { font-size: 24px; font-weight: bold; color: #1e293b; }
+                                    .item { margin-bottom: 15px; }
+                                    .label { font-size: 12px; color: #64748b; font-weight: bold; }
+                                    .val { font-size: 16px; color: #0f172a; margin-top: 5px; }
+                                  </style>
+                                </head>
+                                <body>
+                                  <div class="header">
+                                    <div class="title">${isAr ? rec.toolNameAr : rec.toolNameEn} (Report #${rec.toolId})</div>
+                                    <p>${isAr ? "مستشفى الرعاية السريرية الموحدة - بوابة التدقيق" : "Baheya Integrated Nurse Audit Hub"}</p>
+                                  </div>
+                                  <div class="item">
+                                    <div class="label">${isAr ? "بواسطة الموظف:" : "Generated By:"}</div>
+                                    <div class="val">${isAr ? rec.savedBy?.nameAr : rec.savedBy?.nameEn} (${rec.savedBy?.department})</div>
+                                  </div>
+                                  <div class="item">
+                                    <div class="label">${isAr ? "التاريخ والوقت الإلكتروني:" : "E-Stamp Timestamp:"}</div>
+                                    <div class="val">${new Date(rec.createdAt).toLocaleString()}</div>
+                                  </div>
+                                  <div class="item">
+                                    <div class="label">${isAr ? "النتيجة والتشخيص المحسوب:" : "Computed Result & Telemetry:"}</div>
+                                    <div class="val" style="color: #059669; font-weight: bold;">${rec.output}</div>
+                                  </div>
+                                  <script>window.print();</script>
+                                </body>
+                              </html>
+                            `);
+                            w.document.close();
+                          }
+                        }}
+                        className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[10px] font-bold flex items-center gap-1"
+                      >
+                        <Printer className="w-3 h-3" />
+                        <span>{isAr ? "طباعة" : "Print"}</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteRecord(rec.id)}
+                        className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-[10px] font-bold flex items-center gap-1"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>{isAr ? "حذف" : "Delete"}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
-      </div>
+      )}
 
       {/* RENDER MODAL DYNAMICALLY ON ACTIVE TOOL SELECTION */}
       {selectedTool && (
@@ -1064,13 +1394,10 @@ export default function NursingAdminToolbox({ language }: NursingAdminToolboxPro
             <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex flex-row-reverse gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  triggerToast(isAr ? "تم حفظ السجل الطبي للمريض بنجاح بالملف!" : "Successfully saved parameters to EHR chart!");
-                  setSelectedTool(null);
-                }}
-                className="px-5 py-2.5 bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-sm hover:bg-emerald-700 transition-colors"
+                onClick={handleSaveReport}
+                className="px-5 py-2.5 bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-sm hover:bg-emerald-700 transition-colors animate-pulse hover:animate-none"
               >
-                {isAr ? "حفظ التقرير بالملف" : "Save Report"}
+                {isAr ? "حفظ وتوثيق التقرير بالأرشيف 💾" : "Save & Archive Report 💾"}
               </button>
               
               <button

@@ -704,5 +704,188 @@ export async function saveSetting(key: string, value: any): Promise<void> {
     }
 }
 
+// 15. Quality OVRs Sync and Save
+export function syncCQIOvrs(onData: (ovrs: any[]) => void) {
+  const path = "baheya_cqi_ovrs";
+  return onSnapshot(
+    collection(db, path),
+    (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((doc) => {
+        list.push(doc.data());
+      });
+      onData(list);
+    },
+    (error) => {
+      handleFirestoreError(error, OperationType.LIST, path);
+    }
+  );
+}
+
+export async function saveCQIOvr(ovr: any): Promise<void> {
+  const path = `baheya_cqi_ovrs/${ovr.id}`;
+  try {
+    await setDoc(doc(db, "baheya_cqi_ovrs", ovr.id), ovr);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export async function deleteCQIOvr(ovrId: string): Promise<void> {
+  const path = `baheya_cqi_ovrs/${ovrId}`;
+  try {
+    await deleteDoc(doc(db, "baheya_cqi_ovrs", ovrId));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
+// 16. Staff Evaluation Sync and Save
+export function syncCQIStaffEvals(onData: (evals: any[]) => void) {
+  const path = "baheya_cqi_staff_evals";
+  return onSnapshot(
+    collection(db, path),
+    (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((doc) => {
+        list.push(doc.data());
+      });
+      onData(list);
+    },
+    (error) => {
+      handleFirestoreError(error, OperationType.LIST, path);
+    }
+  );
+}
+
+export async function saveCQIStaffEval(evaluation: any): Promise<void> {
+  const path = `baheya_cqi_staff_evals/${evaluation.id}`;
+  try {
+    await setDoc(doc(db, "baheya_cqi_staff_evals", evaluation.id), evaluation);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export async function deleteCQIStaffEval(evalId: string): Promise<void> {
+  const path = `baheya_cqi_staff_evals/${evalId}`;
+  try {
+    await deleteDoc(doc(db, "baheya_cqi_staff_evals", evalId));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
+// 17. Unit Inspections Sync and Save
+export function syncCQIUnitInspections(onData: (inspections: any[]) => void) {
+  const path = "baheya_cqi_unit_inspections";
+  return onSnapshot(
+    collection(db, path),
+    (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((doc) => {
+        list.push(doc.data());
+      });
+      onData(list);
+    },
+    (error) => {
+      handleFirestoreError(error, OperationType.LIST, path);
+    }
+  );
+}
+
+export async function saveCQIUnitInspection(inspection: any): Promise<void> {
+  const path = `baheya_cqi_unit_inspections/${inspection.id}`;
+  try {
+    await setDoc(doc(db, "baheya_cqi_unit_inspections", inspection.id), inspection);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export async function deleteCQIUnitInspection(inspId: string): Promise<void> {
+  const path = `baheya_cqi_unit_inspections/${inspId}`;
+  try {
+    await deleteDoc(doc(db, "baheya_cqi_unit_inspections", inspId));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
+// 18. Policy Signatures Read-Receipt Log
+export function syncCQIPolicyAcks(onData: (acks: any[]) => void) {
+  const path = "baheya_policy_acks";
+  return onSnapshot(
+    collection(db, path),
+    (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((doc) => {
+        list.push(doc.data());
+      });
+      onData(list);
+    },
+    (error) => {
+      handleFirestoreError(error, OperationType.LIST, path);
+    }
+  );
+}
+
+export async function saveCQIPolicyAck(ack: any): Promise<void> {
+  const path = `baheya_policy_acks/${ack.id}`;
+  try {
+    await setDoc(doc(db, "baheya_policy_acks", ack.id), ack);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export async function deleteCQIPolicyAck(ackId: string): Promise<void> {
+  const path = `baheya_policy_acks/${ackId}`;
+  try {
+    await deleteDoc(doc(db, "baheya_policy_acks", ackId));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
+// 19. Clinical Decision Support Simulator Logs
+export function syncCQIDecisionLogs(onData: (logs: any[]) => void) {
+  const path = "baheya_decision_logs";
+  return onSnapshot(
+    collection(db, path),
+    (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((doc) => {
+        list.push(doc.data());
+      });
+      // Sort descending by timestamp
+      list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      onData(list);
+    },
+    (error) => {
+      handleFirestoreError(error, OperationType.LIST, path);
+    }
+  );
+}
+
+export async function saveCQIDecisionLog(logData: any): Promise<void> {
+  const path = `baheya_decision_logs/${logData.id}`;
+  try {
+    await setDoc(doc(db, "baheya_decision_logs", logData.id), logData);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export async function deleteCQIDecisionLog(logId: string): Promise<void> {
+  const path = `baheya_decision_logs/${logId}`;
+  try {
+    await deleteDoc(doc(db, "baheya_decision_logs", logId));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
+
 
 

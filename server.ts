@@ -116,6 +116,144 @@ Output ONLY a JSON object based on this schema:
     }
 });
 
+  // API Route: Drug-Drug Interaction Checker AI
+  app.post("/api/ai/check-interaction", async (req, res) => {
+    try {
+        const { med1, med2, lang } = req.body;
+        if (!med1 || !med2) {
+            return res.status(400).json({ success: false, error: "Please provide both medication names." });
+        }
+
+        const client = getAiClient();
+        const isAr = lang === "ar";
+
+        const systemInstruction = `
+You are a senior clinical pharmacist specializing in drug safety and drug-drug interactions.
+Analyze the interaction between Medication 1 and Medication 2.
+Output ONLY a JSON object based on this schema:
+{
+  "interaction_severity": "High" | "Moderate" | "Minor" | "None",
+  "has_interaction": boolean,
+  "mechanism": "string description",
+  "clinical_effects": "string description",
+  "recommendation": "string recommendation",
+  "monitoring_guidelines": "string guidelines",
+  "severity_color": "red" | "orange" | "yellow" | "green"
+}
+Output localized text in the requested language: ${isAr ? "Arabic" : "English"}.
+`;
+
+        const response = await client.models.generateContent({
+            model: "gemini-3.5-flash",
+            contents: `Analyze interaction between: "${med1}" and "${med2}"`,
+            config: {
+                systemInstruction: systemInstruction,
+                responseMimeType: "application/json",
+                temperature: 0.1,
+            },
+        });
+
+        let responseJson;
+        try {
+            responseJson = JSON.parse(response.text!);
+        } catch (e) {
+            console.error("Critical: AI interaction returned malformed JSON", response.text);
+            throw new Error("AI data integrity error.");
+        }
+        
+        res.json({ success: true, analysis: responseJson });
+
+    } catch (error: any) {
+        console.error("Medication Interaction API Error:", error);
+        res.status(500).json({ 
+            success: false, 
+            error: error.message || "Failed to analyze drug interaction." 
+        });
+    }
+  });
+
+  // API Route: IV Y-Site Compatibility Checker AI
+  app.post("/api/ai/iv-compatibility", async (req, res) => {
+    try {
+        const { drug1, drug2, fluid, lang } = req.body;
+        if (!drug1 || !drug2) {
+            return res.status(400).json({ success: false, error: "Please provide both drugs." });
+        }
+
+        const client = getAiClient();
+        const isAr = lang === "ar";
+
+        const systemInstruction = `
+You are an IV therapy specialist pharmacist. Determine if Drug 1 and Drug 2 are physically and chemically compatible for Y-site co-administration, optionally considering the base fluid if provided.
+Output ONLY a JSON object based on this schema:
+{
+  "compatibility_status": "Compatible" | "Incompatible" | "Caution" | "Data Not Available",
+  "explanation": "Detailed explanation of compatibility, physical reactions (precipitation, color change, etc.)",
+  "recommendation": "Nursing recommendation"
+}
+Output text in: ${isAr ? "Arabic" : "English"}.
+`;
+        const response = await client.models.generateContent({
+            model: "gemini-3.5-flash",
+            contents: `Drug 1: ${drug1}, Drug 2: ${drug2}, Base Fluid: ${fluid || "None"}`,
+            config: {
+                systemInstruction: systemInstruction,
+                responseMimeType: "application/json",
+                temperature: 0.1,
+            },
+        });
+
+        res.json({ success: true, result: JSON.parse(response.text!) });
+    } catch (error: any) {
+        console.error("IV Compatibility API Error:", error);
+        res.status(500).json({ success: false, error: "Failed to check IV compatibility." });
+    }
+  });
+
+  // API Route: Patient Medication Counseling Generator
+  app.post("/api/ai/medication-counseling", async (req, res) => {
+    try {
+        const { medication, lang } = req.body;
+        if (!medication) {
+            return res.status(400).json({ success: false, error: "Please provide medication." });
+        }
+
+        const client = getAiClient();
+        const isAr = lang === "ar";
+
+        const systemInstruction = `
+You are a patient education pharmacist. Create a simple, patient-friendly counseling sheet for the given medication. 
+Use plain language (no complex medical jargon).
+Output ONLY a JSON object based on this schema:
+{
+  "drug_name": "Name of drug",
+  "what_is_it_for": "Simple explanation",
+  "how_to_take": "Clear instructions",
+  "common_side_effects": ["side effect 1", "side effect 2"],
+  "when_to_call_doctor": ["warning sign 1", "warning sign 2"],
+  "food_drug_interactions": "Simple list of foods or other drugs to avoid",
+  "forgot_dose_instruction": "What to do if a dose is missed"
+}
+Output text in: ${isAr ? "Arabic" : "English"}.
+`;
+        const response = await client.models.generateContent({
+            model: "gemini-3.5-flash",
+            contents: `Medication: ${medication}`,
+            config: {
+                systemInstruction: systemInstruction,
+                responseMimeType: "application/json",
+                temperature: 0.2,
+            },
+        });
+
+        res.json({ success: true, counseling: JSON.parse(response.text!) });
+    } catch (error: any) {
+        console.error("Counseling API Error:", error);
+        res.status(500).json({ success: false, error: "Failed to generate counseling." });
+    }
+  });
+
+
   // API Route: Health Check
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });

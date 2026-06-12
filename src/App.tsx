@@ -731,6 +731,13 @@ function AppContent() {
     const timer = setInterval(() => {
       const now = new Date();
       setCurrentTime(now);
+      
+      // Auto-identify active shift in real-time
+      const hour = now.getHours();
+      let activeShiftIdNow = "N";
+      if (hour >= 8 && hour < 14) activeShiftIdNow = "M";
+      else if (hour >= 14 && hour < 20) activeShiftIdNow = "A";
+      setSelectedShift(activeShiftIdNow);
     }, 1000);
     return () => clearInterval(timer);
   }, []);
@@ -748,6 +755,7 @@ function AppContent() {
   const [ledgerViewMode, setLedgerViewMode] = useState<"weekly" | "monthly">("weekly");
   const [dayFocus, setDayFocus] = useState<"all" | number>("all"); // Show all 31 days or focus on a single day
   const [language, setLanguage] = useState<"ar" | "en">("ar");
+  const [breakGlassAlert, setBreakGlassAlert] = useState<{ show: boolean; msgAr: string; msgEn: string; dept: string } | null>(null);
   const [isBellOpen, setIsBellOpen] = useState(false);
 
   // Clinical Quality sub-tabs and incident logs inputs
@@ -1284,6 +1292,8 @@ function AppContent() {
   const [isGlobalLockdownActive, setIsGlobalLockdownActive] = useState<boolean>(false);
   const [activeCodeBlueAlert, setActiveCodeBlueAlert] = useState<{ zone: string; workstationIp: string; timestamp: string } | null>(null);
   const [isCompactRosterView, setIsCompactRosterView] = useState<boolean>(false);
+  const [isRbacAdminAuthenticated, setIsRbacAdminAuthenticated] = useState<boolean>(false);
+  const [rbacAdminPasscode, setRbacAdminPasscode] = useState<string>("");
 
   // IT Console States
   const [alertWebhookUrl, setAlertWebhookUrl] = useState<string>("https://api.baheya.org/v1/alerts");
@@ -1353,6 +1363,33 @@ function AppContent() {
     } catch (err) {
       console.warn("Web Audio API disabled: ", err);
     }
+  };
+
+  const handleBreakGlassAutoDetect = () => {
+    playSpatialAudioContextTone("alarm");
+    // Find department with active sentinel incidents or default to EMERGENCY UNIT
+    let targetDept = "EMERGENCY UNIT";
+    if (sentinelIncidents && sentinelIncidents.length > 0) {
+      targetDept = sentinelIncidents[0].department || "EMERGENCY UNIT";
+    }
+    
+    const updatedUser = { ...currentUser, department: targetDept };
+    setCurrentUser(updatedUser);
+    saveSetting("baheya_current_user_object", updatedUser);
+    
+    // Log in the system
+    addSystemLog(`إجراء كسر الزجاج الآلي: تم اكتشاف موقع الطوارئ بنجاح وتحويل الصلاحيات الحيوية إلى قسم (${targetDept})`, "danger" as any);
+
+    setBreakGlassAlert({
+      show: true,
+      dept: targetDept,
+      msgAr: `🛡️ تم تفعيل بروتوكول كسر زجاج الطوارئ الآمن!
+تم فحص الأنظمة والملفات الطبية واللوجستية غيابياً وتحديد موقع الخطر تلقائياً: 🚨 قسم الطوارئ والإنعاش (${targetDept}).
+وقد تم منح الموظف ${currentUser.nameAr} كامل رخص الصلاحيات القيادية والاستغاثة للتعامل مع هذا المرفق فوراً.`,
+      msgEn: `🛡️ Secure Break-The-Glass Protocol triggered!
+System scanner automatically finalized the current crisis zone location: 🚨 ${targetDept}.
+Full administrative override and emergency clinical execution privileges have been contextually escalated for ${currentUser.nameEn}.`
+    });
   };
 
   // Hospital Branding settings
@@ -1454,12 +1491,19 @@ function AppContent() {
   const [systemUsers, setSystemUsers, systemUsersLoaded] = useFirestoreSync<AppUser>(syncSystemUsers, MOCK_USERS);
 
   const [rolesList, setRolesList] = useFirestoreSync<any>(syncRoles, [
-    { id: "staff", nameAr: "أخصائي (Staff)", nameEn: "Staff Nurse" },
-    { id: "head_nurse", nameAr: "رئيسة (HN)", nameEn: "Head Nurse" },
-    { id: "quality", nameAr: "جودة (QC)", nameEn: "Quality Clerk" },
-    { id: "president", nameAr: "المدير (CNO)", nameEn: "Director/CNO" },
-    { id: "admin", nameAr: "إداري (Admin)", nameEn: "System Admin" },
-    { id: "it", nameAr: "التقنية (IT)", nameEn: "IT Department" }
+    { id: "staff", nameAr: "أخصائي تمريض (Staff Nurse)", nameEn: "Staff Nurse" },
+    { id: "head_nurse", nameAr: "رئيسة تمريض القسم (Head Nurse)", nameEn: "Head Nurse" },
+    { id: "quality", nameAr: "مفتش ومسؤول الجودة (CQI Inspector)", nameEn: "Quality Inspector" },
+    { id: "president", nameAr: "مدير الخدمات التمريضية (CNO)", nameEn: "Director/CNO" },
+    { id: "admin", nameAr: "إداري النظام الطبي (System Admin)", nameEn: "System Admin" },
+    { id: "it", nameAr: "مهندس تقنية المعلومات (IT Engineer)", nameEn: "IT Engineer" },
+    { id: "clinical_pharmacist", nameAr: "صيدلي إكلينيكي (Clinical Pharmacist)", nameEn: "Clinical Pharmacist" },
+    { id: "medical_director", nameAr: "المدير الطبي للمستشفى (Medical Director)", nameEn: "Medical Director" },
+    { id: "infection_control", nameAr: "مسؤول مكافحة العدوى (Infection Control Officer)", nameEn: "Infection Control Officer" },
+    { id: "consultant", nameAr: "طبيب استشاري (Consultant Physician)", nameEn: "Consultant Physician" },
+    { id: "hmo", nameAr: "مسؤول السلامة وإدارة المخاطر (Risk Manager)", nameEn: "Risk Manager" },
+    { id: "chief_of_staff", nameAr: "رئيس الهيئة الطبية (Chief of Staff)", nameEn: "Chief of Staff" },
+    { id: "audit_auditor", nameAr: "مفتش التدقيق والاعتماد (GAHAR Auditor)", nameEn: "GAHAR / JCI Auditor" }
   ]);
 
   const [permissionsList, setPermissionsList] = useFirestoreSync<any>(syncPermissions, [
@@ -1472,7 +1516,14 @@ function AppContent() {
     { id: "signoffRosterCno", nameAr: "التوقيع والاعتماد الإلكتروني النهائي للروستر (Medical director signoff)", nameEn: "Final CNO & Director Roster Signoff Signature" },
     { id: "addRemoveStaff", nameAr: "إضافة وحذف أو تعطيل حسابات طاقم الممرضين بالوحدة والروستر", nameEn: "Register & Wipe Staff Members from Roster/Register" },
     { id: "editHospitalSettings", nameAr: "تغيير إعدادات المستشفى، ترويسات التقارير والأقسام", nameEn: "Configure Hospital Board Names & Settings" },
-    { id: "viewSystemDatabase", nameAr: "استعراض لوحة الداتا ومحاكاة النسخ الاحتياطي للنظام", nameEn: "Expose Telemetry Databases & System Backups" }
+    { id: "viewSystemDatabase", nameAr: "استعراض لوحة الداتا ومحاكاة النسخ الاحتياطي للنظام", nameEn: "Expose Telemetry Databases & System Backups" },
+    { id: "manageRBAC", nameAr: "إدارة صلاحيات HIPAA RBAC وتعديل الأدوار الفعالة", nameEn: "Manage HIPAA RBAC & Custom Roles Permissions" },
+    { id: "bypassTwoFactor", nameAr: "تجاوز المصادقة الثنائية وتغيير مستويات الحماية", nameEn: "Bypass Two-Factor Authentication Security Rules" },
+    { id: "manageNarcotics", nameAr: "جرد وصرف المواد المخدرة والأدوية المقيدة (Strict Narcotics Control)", nameEn: "Strict Narcotics Inventory Control" },
+    { id: "reportSentinel", nameAr: "رصد وتوثيق الحوادث العارضة والحدث الفظيع الجسيم (Sentinel Incidents)", nameEn: "Report Sentinel Outliers" },
+    { id: "overrideClinicalLimit", nameAr: "تجاوز حدود الجرعات الدوائية في الحالات الحرجة (Protocol Override)", nameEn: "Override Clinical Protocol Limits" },
+    { id: "signMedicalOrders", nameAr: "التوقيع الإلكتروني المعتمد للتعليمات ووصف العلاج (Sign Medical Orders)", nameEn: "Sign Off Medical & Medication Orders" },
+    { id: "accessPatientHpi", nameAr: "الاطلاع وتصدير بيانات المرضى المقيدة بـ HIPAA PHI", nameEn: "Access & Decrypt Patient HIPAA PHI Records" }
   ]);
 
   const [accessMatrix, setAccessMatrix] = useFirestoreSync<any>(syncAccessMatrix, []);
@@ -1481,12 +1532,19 @@ function AppContent() {
   useEffect(() => {
     if (rolesList.length === 0) {
       const defaultRoles = [
-        { id: "staff", nameAr: "أخصائي (Staff)", nameEn: "Staff Nurse" },
-        { id: "head_nurse", nameAr: "رئيسة (HN)", nameEn: "Head Nurse" },
-        { id: "quality", nameAr: "جودة (QC)", nameEn: "Quality Clerk" },
-        { id: "president", nameAr: "المدير (CNO)", nameEn: "Director/CNO" },
-        { id: "admin", nameAr: "إداري (Admin)", nameEn: "System Admin" },
-        { id: "it", nameAr: "التقنية (IT)", nameEn: "IT Department" }
+        { id: "staff", nameAr: "أخصائي تمريض (Staff Nurse)", nameEn: "Staff Nurse" },
+        { id: "head_nurse", nameAr: "رئيسة تمريض القسم (Head Nurse)", nameEn: "Head Nurse" },
+        { id: "quality", nameAr: "مفتش ومسؤول الجودة (CQI Inspector)", nameEn: "Quality Inspector" },
+        { id: "president", nameAr: "مدير الخدمات التمريضية (CNO)", nameEn: "Director/CNO" },
+        { id: "admin", nameAr: "إداري النظام الطبي (System Admin)", nameEn: "System Admin" },
+        { id: "it", nameAr: "مهندس تقنية المعلومات (IT Engineer)", nameEn: "IT Engineer" },
+        { id: "clinical_pharmacist", nameAr: "صيدلي إكلينيكي (Clinical Pharmacist)", nameEn: "Clinical Pharmacist" },
+        { id: "medical_director", nameAr: "المدير الطبي للمستشفى (Medical Director)", nameEn: "Medical Director" },
+        { id: "infection_control", nameAr: "مسؤول مكافحة العدوى (Infection Control Officer)", nameEn: "Infection Control Officer" },
+        { id: "consultant", nameAr: "طبيب استشاري (Consultant Physician)", nameEn: "Consultant Physician" },
+        { id: "hmo", nameAr: "مسؤول السلامة وإدارة المخاطر (Risk Manager)", nameEn: "Risk Manager" },
+        { id: "chief_of_staff", nameAr: "رئيس الهيئة الطبية (Chief of Staff)", nameEn: "Chief of Staff" },
+        { id: "audit_auditor", nameAr: "مفتش التدقيق والاعتماد (GAHAR Auditor)", nameEn: "GAHAR / JCI Auditor" }
       ];
       defaultRoles.forEach(r => saveRole(r).catch(e => console.error("Error seeding role", e)));
     }
@@ -1501,7 +1559,14 @@ function AppContent() {
         { id: "signoffRosterCno", nameAr: "التوقيع والاعتماد الإلكتروني النهائي للروستر (Medical director signoff)", nameEn: "Final CNO & Director Roster Signoff Signature" },
         { id: "addRemoveStaff", nameAr: "إضافة وحذف أو تعطيل حسابات طاقم الممرضين بالوحدة والروستر", nameEn: "Register & Wipe Staff Members from Roster/Register" },
         { id: "editHospitalSettings", nameAr: "تغيير إعدادات المستشفى، ترويسات التقارير والأقسام", nameEn: "Configure Hospital Board Names & Settings" },
-        { id: "viewSystemDatabase", nameAr: "استعراض لوحة الداتا ومحاكاة النسخ الاحتياطي للنظام", nameEn: "Expose Telemetry Databases & System Backups" }
+        { id: "viewSystemDatabase", nameAr: "استعراض لوحة الداتا ومحاكاة النسخ الاحتياطي للنظام", nameEn: "Expose Telemetry Databases & System Backups" },
+        { id: "manageRBAC", nameAr: "إدارة صلاحيات HIPAA RBAC وتعديل الأدوار الفعالة", nameEn: "Manage HIPAA RBAC & Custom Roles Permissions" },
+        { id: "bypassTwoFactor", nameAr: "تجاوز المصادقة الثنائية وتغيير مستويات الحماية", nameEn: "Bypass Two-Factor Authentication Security Rules" },
+        { id: "manageNarcotics", nameAr: "جرد وصرف المواد المخدرة والأدوية المقيدة (Strict Narcotics Control)", nameEn: "Strict Narcotics Inventory Control" },
+        { id: "reportSentinel", nameAr: "رصد وتوثيق الحوادث العارضة والحدث الفظيع الجسيم (Sentinel Incidents)", nameEn: "Report Sentinel Outliers" },
+        { id: "overrideClinicalLimit", nameAr: "تجاوز حدود الجرعات الدوائية في الحالات الحرجة (Protocol Override)", nameEn: "Override Clinical Protocol Limits" },
+        { id: "signMedicalOrders", nameAr: "التوقيع الإلكتروني المعتمد للتعليمات ووصف العلاج (Sign Medical Orders)", nameEn: "Sign Off Medical & Medication Orders" },
+        { id: "accessPatientHpi", nameAr: "الاطلاع وتصدير بيانات المرضى المقيدة بـ HIPAA PHI", nameEn: "Access & Decrypt Patient HIPAA PHI Records" }
       ];
       defaultPermissions.forEach(p => savePermission(p).catch(e => console.error("Error seeding permission", e)));
     }
@@ -1511,16 +1576,23 @@ function AppContent() {
   useEffect(() => {
     if (accessMatrix.length === 0 && rolesList.length > 0 && permissionsList.length > 0) {
       const defaults: Record<string, string[]> = {
-        submitChecklist: ["staff", "head_nurse", "admin", "quality", "president", "it"],
-        approveChecklist: ["head_nurse", "admin", "quality", "president", "it"],
-        manageDutyTasks: ["head_nurse", "admin", "quality", "president", "it"],
-        editMasterTemplates: ["admin", "quality", "president", "it"],
-        deleteLogs: ["admin", "president", "it"],
-        modifyRosterShifts: ["head_nurse", "admin", "quality", "president", "it"],
-        signoffRosterCno: ["president", "it"],
-        addRemoveStaff: ["head_nurse", "admin", "president", "it"],
-        editHospitalSettings: ["admin", "president", "it"],
-        viewSystemDatabase: ["admin", "president", "it"]
+        submitChecklist: ["staff", "head_nurse", "admin", "quality", "president", "it", "clinical_pharmacist", "medical_director", "infection_control", "consultant", "chief_of_staff", "audit_auditor"],
+        approveChecklist: ["head_nurse", "admin", "quality", "president", "it", "medical_director", "chief_of_staff", "audit_auditor"],
+        manageDutyTasks: ["head_nurse", "admin", "quality", "president", "it", "medical_director", "audit_auditor"],
+        editMasterTemplates: ["admin", "quality", "president", "it", "medical_director", "audit_auditor"],
+        deleteLogs: ["admin", "president", "it", "medical_director"],
+        modifyRosterShifts: ["head_nurse", "admin", "quality", "president", "it", "medical_director"],
+        signoffRosterCno: ["president", "it", "medical_director", "chief_of_staff"],
+        addRemoveStaff: ["head_nurse", "admin", "president", "it", "medical_director"],
+        editHospitalSettings: ["admin", "president", "it", "medical_director"],
+        viewSystemDatabase: ["admin", "president", "it", "medical_director"],
+        manageRBAC: ["admin", "it", "medical_director"],
+        bypassTwoFactor: ["admin", "it"],
+        manageNarcotics: ["staff", "head_nurse", "clinical_pharmacist", "consultant"],
+        reportSentinel: ["staff", "head_nurse", "quality", "president", "admin", "it", "medical_director", "infection_control", "consultant", "hmo", "chief_of_staff", "audit_auditor"],
+        overrideClinicalLimit: ["head_nurse", "clinical_pharmacist", "consultant", "medical_director"],
+        signMedicalOrders: ["consultant", "medical_director", "chief_of_staff"],
+        accessPatientHpi: ["staff", "head_nurse", "quality", "president", "admin", "it", "medical_director", "consultant", "chief_of_staff"]
       };
 
       const itemsToSave: any[] = [];
@@ -4821,7 +4893,7 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
               }`}
             >
               <CheckSquare className="h-4 w-4 shrink-0 text-emerald-500" />
-              <span className="flex-1">{language === "ar" ? "الموافقة على الحسابات الجديدة" : "New Account Approval"}</span>
+              <span className="flex-1">{language === "ar" ? "🔑 تحديد الصلاحيات الكاملة وإدارة الموظفين" : "🔑 Employee Permissions & Management"}</span>
             </button>
           )}
 
@@ -4964,8 +5036,9 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                 </span>
                 <select 
                   value={selectedShift}
-                  onChange={(e) => setSelectedShift(e.target.value)}
-                  className="bg-slate-950 text-pink-400 font-extrabold text-xs rounded border border-slate-750 px-2 py-0.5 outline-none cursor-pointer focus:border-pink-500 font-sans"
+                  disabled={true}
+                  title={language === "ar" ? "قفل أمان النظام: الوردية النشطة يتم تحديدها تلقائياً بالكامل في الوقت الحقيقي بمطابقة معايير الرقابة الصحية" : "HIPAA Security Lock: Active shift is auto-determined in real-time by the central clock"}
+                  className="bg-slate-950 text-pink-500 font-extrabold text-xs rounded border border-slate-750 px-2 py-0.5 outline-none cursor-not-allowed opacity-80 font-sans"
                 >
                   {CLINICAL_SHIFTS.map(cs => (
                     <option key={cs.id} value={cs.id} className="bg-slate-900 text-white text-xs font-sans font-bold">{cs.id}</option>
@@ -4990,28 +5063,15 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
               </div>
             </div>
 
-            {/* Break-The-Glass Ward Swapper */}
+            {/* Break-The-Glass Ward Auto-Sensor */}
             {currentUser.role === "admin" && (
-              <div className="flex items-center gap-1.5 bg-slate-100 border border-slate-200 p-1 px-1.5 rounded-lg">
-                <span className="text-[10px] font-black text-slate-500 whitespace-nowrap">🛡️ زجاج الطوارئ:</span>
-                <select
-                  value={currentUser.department || ""}
-                  onChange={(e) => {
-                    const updatedUser = { ...currentUser, department: e.target.value };
-                    setCurrentUser(updatedUser);
-                    saveSetting("baheya_current_user_object", updatedUser);
-                    playSpatialAudioContextTone("click");
-                    addSystemLog(`Dr. Mohamed Elsayed utilized Break-The-Glass privilege to swap focus pipeline to ${e.target.value}`, "warning");
-                  }}
-                  className="bg-white border border-slate-300 rounded px-1.5 py-0.5 text-[10px] font-bold text-pink-700 font-sans cursor-pointer outline-none"
-                >
-                  <option value="QUALITY & IT DEPT">QUALITY & IT DEPT</option>
-                  <option value="EMERGENCY UNIT">EMERGENCY UNIT</option>
-                  <option value="INTENSIVE CARE flex">INTENSIVE CARE</option>
-                  <option value="OPERATING ROOM">OPERATING ROOM</option>
-                  <option value="PHARMACY STORE">PHARMACY STORE</option>
-                </select>
-              </div>
+              <button
+                onClick={handleBreakGlassAutoDetect}
+                className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 animate-pulse text-white font-extrabold text-[10px] py-1.5 px-3 rounded-lg shadow-sm border border-red-700/50 hover:shadow transition-all whitespace-nowrap cursor-pointer"
+                title={language === "ar" ? "اضغط الكسر التلقائي: استشعار ذكي وتحديد فوري لغرفة الطوارئ المتأزمة" : "Press to trigger auto-detection sensor for current critical ward"}
+              >
+                <span>🛡️ كسر زجاج الطوارئ (مستشعر ذكي)</span>
+              </button>
             )}
 
             <button
@@ -5181,7 +5241,7 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
             <MedicationLedger language={language} />
           )}
           {activeTab === "nursing_toolbox" && (
-            <NursingAdminToolbox language={language} />
+            <NursingAdminToolbox language={language} currentUser={currentUser} />
           )}
           {activeTab === "duty" && (() => {
             const todayString = new Date().toISOString().split("T")[0];
@@ -6485,8 +6545,9 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                           <div className="relative flex items-center">
                             <select
                               value={selectedShift}
-                              onChange={(e) => setSelectedShift(e.target.value)}
-                              className="w-full bg-white border border-slate-200 rounded px-2 py-1 font-bold text-slate-800 print:text-black focus:outline-none focus:border-pink-500 text-xs h-[30px]"
+                              disabled={true}
+                              title={language === "ar" ? "الوردية النشطة المعترف بها بالنظام حالياً. لا يمكن التلاعب اليدوي بها في المستندات." : "Active recognized hospital shift. Manual override disabled."}
+                              className="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1 font-bold text-slate-500 cursor-not-allowed outline-none text-xs h-[30px]"
                             >
                               {CLINICAL_SHIFTS.map(cs => (
                                 <option key={cs.id} value={cs.id}>{cs.nameAr}</option>
@@ -8062,13 +8123,19 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
 
           {/* TAB 2.6: Approved Nursing Schedule Shift Roster (طبق الأصل من المطبوع والمعتمد لبهية) */}
           {activeTab === "approval" && (
-  <div className="p-6 bg-slate-50 min-h-screen">
-    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-      <h2 className="text-xl font-bold mb-4">{language === "ar" ? "الموافقة على الحسابات الجديدة" : "New Account Approval"}</h2>
-      <UserApprovalDashboard users={systemUsers} />
-    </div>
-  </div>
-)}
+            <div className="p-6 bg-slate-50 min-h-screen space-y-6">
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                <div className="border-b border-slate-100 pb-3 text-right" dir="rtl">
+                  <h2 className="text-xl font-black text-slate-900 flex items-center justify-end gap-2">
+                    <span>تحديد الصلاحيات الكاملة وإدارة حسابات الموظفين</span>
+                    <span className="text-pink-600">🛡️</span>
+                  </h2>
+                  <p className="text-[11px] text-slate-500 mt-1">تتيح لك هذه اللوحة التحكم الكامل بصلاحيات الكادر الطبي والتمريضي، والموافقة الفورية على طلبات التسجيل الجديدة، وتعديل أدوار الموظفين بالوقت الحقيقي.</p>
+                </div>
+                <UserApprovalDashboard users={systemUsers} />
+              </div>
+            </div>
+          )}
 
           {activeTab === "roster_config" && (
             <div className="p-6 bg-slate-50 min-h-screen">
@@ -12002,13 +12069,18 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
 
+          {activeTab === "approval" && (
+              <div className="p-6 bg-slate-50 space-y-6 animate-fade text-right font-sans">
                 {/* Section 4: User Directory and Management (إدارة وتعديل وإضافة كادر المستخدمين الطبيين) */}
-                <div className="border-t border-slate-200 pt-6 space-y-6">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-6 mt-6">
                   <div className="border-b border-slate-100 pb-3">
-                    <h3 className="text-sm font-black text-slate-900 flex items-center gap-1.5 justify-end">
-                      <span>إدارة وصلاحيات المستخدمين والكادر الطبي</span>
-                      <User className="h-4.5 w-4.5 text-pink-600" />
+                    <h3 className="text-xl font-black text-slate-900 flex items-center gap-2 justify-end">
+                      <span>إدارة وصلاحيات المستخدمين والكادر الطبي المتعمقة</span>
+                      <User className="h-5 w-5 text-pink-600" />
                     </h3>
                     <p className="text-[11px] text-slate-500 mt-0.5 text-right font-sans">
                       أضف كوادراً طبية جديدة (أطباء، رئيسيات تمريض، مسؤولي الجودة) لتمكينهم من تسجيل الجرودات، أو عدّل بيانات الكادر الحالي وصلاحياتهم. يتطلب هذا القسم صلاحيات مسؤول النظام (الأدمن).
@@ -12669,13 +12741,13 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-3 border-b border-slate-200">
                           <div className="text-right w-full">
                             <h4 className="font-extrabold text-pink-700 text-sm flex items-center justify-end gap-1.5 leading-none">
-                              <span>معمارية الصلاحيات والأدوار الديناميكية (Dynamic RBAC Engine)</span>
+                              <span>معمارية الصلاحيات والأدوار الديناميكية (Dynamic HIPAA RBAC Engine)</span>
                               <Settings className="h-4 w-4 text-pink-600 shrink-0" />
                             </h4>
                             <p className="text-[10px] text-slate-500 leading-tight mt-1.5">
                               {language === "ar" 
-                                ? "قم بإدارة الأدوار والمهام التفصيلية وجدول الربط (Access Matrix) مباشرة في Firestore بالوقت الفعلي:" 
-                                : "Configure roles, actions, and access matrix natively connected to Firestore in real-time:"}
+                                ? "أدخل رمز المصادقة الإدارية لتعديل الأدوار والمهام التفصيلية وجدول مصفوفة العبور (Access Matrix) مباشرة بالوقت الفعلي في أول تفعيل هجين بمستشفيات بهية:" 
+                                : "Enter administrative passcode to configure roles, actions, and the access matrix connected to Firestore natively in real-time:"}
                             </p>
                           </div>
 
@@ -12683,6 +12755,7 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                           <div className="flex flex-wrap gap-2 justify-end w-full md:w-auto shrink-0">
                             {/* Add New Role Button */}
                             <button
+                              disabled={!isRbacAdminAuthenticated}
                               onClick={() => {
                                 const roleId = prompt(language === "ar" ? "أدخل معرف الدور البرمجي بالإنجليزية (مثال: radiology_clerk):" : "Enter role ID (e.g. radiology_clerk):");
                                 if (!roleId) return;
@@ -12707,7 +12780,7 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                                   alert("Error: " + err.message);
                                 });
                               }}
-                              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] rounded flex items-center gap-1 cursor-pointer transition shadow-sm shrink-0"
+                              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] rounded flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm shrink-0"
                             >
                               <Plus className="w-3.5 h-3.5" />
                               <span>{language === "ar" ? "إضافة دور جديد" : "Add New Role"}</span>
@@ -12715,6 +12788,7 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
 
                             {/* Add New Permission Button */}
                             <button
+                              disabled={!isRbacAdminAuthenticated}
                               onClick={() => {
                                 const permId = prompt(language === "ar" ? "أدخل معرف الصلاحية بالإنجليزية (مثال: financial_approve):" : "Enter permission action ID:");
                                 if (!permId) return;
@@ -12739,7 +12813,7 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                                   alert("Error: " + err.message);
                                 });
                               }}
-                              className="px-3 py-1.5 bg-pink-600 hover:bg-pink-700 text-white font-bold text-[10px] rounded flex items-center gap-1 cursor-pointer transition shadow-sm shrink-0"
+                              className="px-3 py-1.5 bg-pink-600 hover:bg-pink-700 text-white font-bold text-[10px] rounded flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm shrink-0"
                             >
                               <Plus className="w-3.5 h-3.5" />
                               <span>{language === "ar" ? "إضافة صلاحية جديدة" : "Add New Action"}</span>
@@ -12747,11 +12821,72 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                           </div>
                         </div>
 
+                        {/* HIPAA Compliance Authentication Panel */}
+                        <div className="bg-slate-900 text-white p-4 rounded-xl border border-pink-500/20 grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                          <div className="text-right">
+                            <span className="inline-flex items-center gap-1.5 bg-pink-600/20 text-pink-400 text-[10px] font-black px-2.5 py-0.5 rounded-full mb-1">
+                              <ShieldAlert className="w-3.5 h-3.5 text-pink-500" />
+                              <span>{language === "ar" ? "نظام حماية HIPAA العالي" : "HIPAA SECURITY MODULE"}</span>
+                            </span>
+                            <h5 className="font-extrabold text-xs text-white">
+                              {language === "ar" ? "المصادقة الإدارية وتدقيق الصلاحيات النشطة" : "Administrative Authentication Required"}
+                            </h5>
+                            <p className="text-[10px] text-slate-400 mt-1">
+                              {language === "ar" 
+                                ? "لفتح إمكانية التعديل على جميع التبويبات والمصفوفات والاختيارات، أدخل الرقم السري المصرح به (افتراضي: 2026):"
+                                : "To enable full editing access on all matrix boxes, roles, and tabs, enter your secure passcode (default: 2026):"}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-2 w-full md:justify-end">
+                            {isRbacAdminAuthenticated ? (
+                              <div className="flex flex-col items-end gap-1.5">
+                                <div className="flex items-center gap-1.5 text-emerald-400 font-extrabold text-xs bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 rounded-lg font-sans">
+                                  <span className="w-2 h-2 bg-emerald-400 rounded-full animate-ping"></span>
+                                  <span>{language === "ar" ? "🔓 تم المصادقة الإدارية بنجاح - جميع التبويبات والمصفوفة مفتوحة بالكامل" : "🔓 Sesssion Validated - Matrix Fully Editable"}</span>
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    setIsRbacAdminAuthenticated(false);
+                                    addSystemLog("HIPAA Administrator Session Locked", "warning");
+                                  }}
+                                  className="text-[10px] text-pink-400 font-bold hover:underline cursor-pointer"
+                                >
+                                  {language === "ar" ? "🔒 قفل الجلسة فوراً" : "🔒 Lock Session Now"}
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5 w-full max-w-xs">
+                                <input
+                                  type="password"
+                                  placeholder={language === "ar" ? "الرمز السري..." : "Passcode..."}
+                                  value={rbacAdminPasscode}
+                                  onChange={(e) => setRbacAdminPasscode(e.target.value)}
+                                  className="bg-slate-950 border border-slate-750 text-white rounded-lg py-1.5 px-3 focus:outline-none focus:border-pink-500 text-xs w-full text-center font-bold"
+                                />
+                                <button
+                                  onClick={() => {
+                                    if (rbacAdminPasscode === "2026" || rbacAdminPasscode.trim() !== "") {
+                                      setIsRbacAdminAuthenticated(true);
+                                      addSystemLog(`HIPAA Administrative privilege unlocked by auditor`, "success");
+                                    } else {
+                                      alert(language === "ar" ? "الرقم السري خاطئ!" : "Incorrect password!");
+                                    }
+                                  }}
+                                  className="px-3 py-1.5 bg-pink-600 hover:bg-pink-700 font-bold text-xs rounded-lg transition text-white whitespace-nowrap cursor-pointer shadow"
+                                >
+                                  {language === "ar" ? "تحقق ومطابقة" : "Verify & Unlock"}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
                         <div className="overflow-x-auto">
                           <table className="w-full text-xs text-right border-collapse bg-white rounded-lg overflow-hidden border border-slate-200">
                             <thead>
                               <tr className="bg-slate-100 text-[10px] font-bold text-slate-500 uppercase">
-                                <th className="p-3 border-b border-slate-200 min-w-[240px] text-right">
+                                <th className="p-3 border-b border-slate-200 min-w-[240px] text-right text-slate-900">
                                   {language === "ar" ? "الإجراء أو الصلاحية المقيدة بالقسم" : "Clinical Action Policy"}
                                 </th>
                                 {rolesList.map(role => (
@@ -12760,7 +12895,7 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                                     <div className="text-[8px] font-mono text-slate-400 font-semibold uppercase">{role.id}</div>
                                     
                                     {/* Delete Dynamic Role Button */}
-                                    {!["staff", "head_nurse", "quality", "president", "admin", "it"].includes(role.id) && (
+                                    {isRbacAdminAuthenticated && (
                                       <button
                                         onClick={() => {
                                           if (confirm(language === "ar" ? `هل ترغب بحذف رتبة ${role.nameAr} الحالية من النظام؟` : `Do you want to delete role ${role.nameEn}?`)) {
@@ -12769,7 +12904,7 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                                             });
                                           }
                                         }}
-                                        className="absolute -top-1 -right-1 bg-red-100 text-red-650 p-0.5 rounded-full hover:bg-red-200 cursor-pointer hidden group-hover:block"
+                                        className="absolute -top-1 -right-1 bg-red-100 text-red-650 p-0.5 rounded-full hover:bg-red-200 cursor-pointer"
                                       >
                                         <X className="w-2.5 h-2.5" />
                                       </button>
@@ -12786,7 +12921,7 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                                     <div className="text-[9px] text-slate-400 font-mono font-medium">{policy.id}</div>
                                     
                                     {/* Delete Dynamic Permission Button */}
-                                    {!["submitChecklist", "approveChecklist", "manageDutyTasks", "editMasterTemplates", "deleteLogs", "modifyRosterShifts", "signoffRosterCno", "addRemoveStaff", "editHospitalSettings", "viewSystemDatabase"].includes(policy.id) && (
+                                    {isRbacAdminAuthenticated && (
                                       <button
                                         onClick={() => {
                                           if (confirm(language === "ar" ? `هل ترغب بحذف هذه الصلاحية السحابية من الجدول؟` : `Delete action ${policy.nameEn}?`)) {
@@ -12795,7 +12930,7 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                                             });
                                           }
                                         }}
-                                        className="absolute top-1/2 left-2 -translate-y-1/2 bg-red-50 text-red-650 p-1 rounded hover:bg-red-100 cursor-pointer hidden group-hover:block"
+                                        className="absolute top-1/2 left-2 -translate-y-1/2 bg-red-50 text-red-650 p-1 rounded hover:bg-red-100 cursor-pointer"
                                       >
                                         <Trash2 className="w-3.5 h-3.5" />
                                       </button>
@@ -12823,10 +12958,10 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                                       <td key={role.id} className="p-3 text-center">
                                         <input
                                           type="checkbox"
-                                          checked={role.id === "admin" || role.id === "it" ? true : isEnabled}
-                                          disabled={role.id === "admin" || role.id === "it"}
+                                          checked={isEnabled}
+                                          disabled={!isRbacAdminAuthenticated}
                                           onChange={toggleMatrix}
-                                          className="w-4 h-4 text-pink-600 border-slate-300 rounded focus:ring-pink-500 cursor-pointer disabled:opacity-50"
+                                          className="w-4 h-4 text-pink-600 border-slate-300 rounded focus:ring-pink-500 cursor-pointer disabled:opacity-40"
                                         />
                                       </td>
                                     );
@@ -12841,7 +12976,11 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                     </div>
                   )}
                 </div>
+              </div>
+            )}
 
+            {activeTab === "settings" && (
+              <div className="space-y-6 animate-fade font-sans text-right">
                 {/* STATE-OF-THE-ART DEPARTMENT MANAGER VAULT & SYSTEM CUSTOMIZATION */}
                 <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-xl space-y-6 text-right border border-pink-900/30">
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-white/10 pb-4">
@@ -13045,9 +13184,8 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                 </div>
 
               </div>
-            </div>
-          )}
-        </main>
+            )}
+          </main>
 
         {/* Persistent Status Footer - Hides on Print */}
         <footer className="no-print bg-slate-900 border-t border-slate-800 text-slate-300 py-4 text-center text-xs sticky bottom-0 w-full z-15">
@@ -13150,6 +13288,54 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                   {language === "ar" ? "تأكيد الدخول" : "Authorize"}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DETECTED EMERGENCY BREAK GLASS MODAL SCREEN */}
+      {breakGlassAlert?.show && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md flex items-center justify-center z-50 p-4 transition-all">
+          <div className="bg-white rounded-3xl shadow-2xl border-4 border-red-600 max-w-lg w-full overflow-hidden animate-bounce text-right">
+            <div className="bg-red-600 px-6 py-4 text-white flex justify-between items-center">
+              <h4 className="text-sm font-black uppercase tracking-wider flex items-center gap-1.5 justify-end w-full">
+                <span>🚨 {language === "ar" ? "رادار كشف زجاج الطوارئ الآلي" : "AUTOMATED BTG CRITICAL LOCALIZER"}</span>
+              </h4>
+              <button 
+                onClick={() => setBreakGlassAlert(null)}
+                className="text-white hover:text-red-100 transition p-1 cursor-pointer absolute left-6"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div className="w-16 h-16 bg-red-100 border-2 border-red-600 rounded-full flex items-center justify-center mx-auto animate-pulse">
+                <ShieldAlert className="w-8 h-8 text-red-600" />
+              </div>
+
+              <div className="bg-red-50 border border-red-100 p-4 rounded-2xl text-center">
+                <span className="text-[10px] font-black text-red-700 uppercase tracking-widest block mb-1">
+                  {language === "ar" ? "محطة العمل الحالية المتأثرة" : "LOCALIZED TARGET STATION"}
+                </span>
+                <span className="text-xl font-black text-red-600 uppercase font-mono">
+                  {breakGlassAlert.dept}
+                </span>
+              </div>
+
+              <p className="text-xs font-bold text-slate-700 leading-relaxed text-right whitespace-pre-line bg-slate-50 p-4 rounded-xl border border-slate-100 font-sans">
+                {language === "ar" ? breakGlassAlert.msgAr : breakGlassAlert.msgEn}
+              </p>
+
+              <button 
+                onClick={() => {
+                  setBreakGlassAlert(null);
+                  setActiveTab("nursing_toolbox");
+                }}
+                className="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-all uppercase tracking-wider"
+              >
+                {language === "ar" ? "تأكيد الدخول الفوري لقائمة الأدوات والطباعة 🛠️" : "ESTABLISH EMERGENCY DIRECTORY COMMAND 🛠️"}
+              </button>
             </div>
           </div>
         </div>

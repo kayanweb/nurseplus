@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { saveNotification } from '../lib/firestoreService';
+import { saveNotification, saveRosterWish, saveDepartmentRoster } from '../lib/firestoreService';
 import { 
   MessageSquare, 
   Send, 
@@ -1030,11 +1030,7 @@ function VacationRequestView({
       submittedAt: new Date().toISOString()
     };
 
-    if (setRosterWishes) {
-      const updated = [newWish, ...rosterWishes];
-      setRosterWishes(updated);
-      localStorage.setItem("baheya_roster_wishes", JSON.stringify(updated));
-    }
+    saveRosterWish(newWish).catch(err => console.error("Cloud wish sync error:", err));
 
     if (setNotifications) {
       const newNotification = {
@@ -1046,8 +1042,6 @@ function VacationRequestView({
         type: "wish",
         targetSection: "roster"
       };
-      const updatedNotifs = [newNotification, ...notifications];
-      setNotifications(updatedNotifs);
       saveNotification(newNotification);
     }
 
@@ -1061,22 +1055,18 @@ function VacationRequestView({
   };
 
   const handleApprove = (wish: any) => {
-    if (!setRosterWishes || !setRosterList) return;
+    // Approve wish in Firestore
+    saveRosterWish({ ...wish, status: "approved" }).catch(err => console.error("Cloud wish approve error:", err));
 
-    // Approve wish in list
-    const updatedWishes = rosterWishes.map(w => w.id === wish.id ? { ...w, status: "approved" } : w);
-    setRosterWishes(updatedWishes);
-    localStorage.setItem("baheya_roster_wishes", JSON.stringify(updatedWishes));
-
-    // Update roster row
-    const nextRosterList = rosterList.map((rost) => {
+    // Update roster row and save to Firestore
+    rosterList.forEach((rost) => {
       const hasEmployee = rost.rows.some((row: any) => 
         row.employeeId === wish.employeeId || 
         row.employeeCode === wish.employeeId ||
         row.employeeNameEn.toLowerCase().trim() === wish.employeeNameEn.toLowerCase().trim()
       );
       if (hasEmployee) {
-        return {
+        const updatedRost = {
           ...rost,
           rows: rost.rows.map((row: any) => {
             if (
@@ -1095,12 +1085,9 @@ function VacationRequestView({
             return row;
           })
         };
+        saveDepartmentRoster(updatedRost).catch(err => console.error("Cloud roster sync error:", err));
       }
-      return rost;
     });
-
-    setRosterList(nextRosterList);
-    localStorage.setItem("baheya_department_rosters", JSON.stringify(nextRosterList));
 
     if (setNotifications) {
       const newNotification = {
@@ -1112,8 +1099,6 @@ function VacationRequestView({
         type: "wish",
         targetSection: "roster"
       };
-      const updatedNotifs = [newNotification, ...notifications];
-      setNotifications(updatedNotifs);
       saveNotification(newNotification);
     }
 
@@ -1124,11 +1109,8 @@ function VacationRequestView({
   };
 
   const handleReject = (wish: any) => {
-    if (!setRosterWishes) return;
-
-    const updated = rosterWishes.map(w => w.id === wish.id ? { ...w, status: "rejected" } : w);
-    setRosterWishes(updated);
-    localStorage.setItem("baheya_roster_wishes", JSON.stringify(updated));
+    // Reject wish in Firestore
+    saveRosterWish({ ...wish, status: "rejected" }).catch(err => console.error("Cloud wish reject error:", err));
 
     if (setNotifications) {
       const newNotification = {
@@ -1140,8 +1122,6 @@ function VacationRequestView({
         type: "wish",
         targetSection: "roster"
       };
-      const updatedNotifs = [newNotification, ...notifications];
-      setNotifications(updatedNotifs);
       saveNotification(newNotification);
     }
 

@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { AppUser, DepartmentRoster } from "../types";
-import { saveSystemUser, saveRosterWish, syncRosterWishes, deleteRosterWish, saveSystemLog, syncDepartmentRosters } from "../lib/firestoreService";
+import { 
+  saveSystemUser, saveRosterWish, syncRosterWishes, deleteRosterWish, saveSystemLog, syncDepartmentRosters,
+  syncLeaveRequests, saveLeaveRequest, deleteLeaveRequest, syncAdminRequests, saveAdminRequest, deleteAdminRequest
+} from "../lib/firestoreService";
 import { 
   User, Shield, Activity, Award, Clock, Key, Settings, 
   Sparkles, HeartPulse, ShieldAlert, BadgeCheck, CheckCircle2,
@@ -327,15 +330,6 @@ export default function ProfileView({ user, language, hospitalSettings }: Profil
         errorRatio: "0.15%",
         completionDays: 31
       });
-
-      // Load leaves from localStorage
-      const cachedLeaves = JSON.parse(localStorage.getItem("baheya_leave_requests") || "[]");
-      setMyLeavesList(cachedLeaves.filter((l: LeaveRequestRecord) => l.employeeId === user.id));
-
-      // Load admin requests from localStorage
-      const cachedAdmin = JSON.parse(localStorage.getItem("baheya_admin_requests") || "[]");
-      setMyAdminReqList(cachedAdmin.filter((a: AdminRequestRecord) => a.employeeId === user.id));
-
     } catch (e) {
       console.error(e);
     }
@@ -350,9 +344,21 @@ export default function ProfileView({ user, language, hospitalSettings }: Profil
       setSystemRosters(rosters);
     });
 
+    // Sync leaves from Firestore
+    const unsubLeaves = syncLeaveRequests((leaves) => {
+      setMyLeavesList(leaves.filter((l: LeaveRequestRecord) => l.employeeId === user.id));
+    });
+
+    // Sync admin requests from Firestore
+    const unsubAdmin = syncAdminRequests((reqs) => {
+      setMyAdminReqList(reqs.filter((a: AdminRequestRecord) => a.employeeId === user.id));
+    });
+
     return () => {
       unsub();
       unsubRosters();
+      unsubLeaves();
+      unsubAdmin();
     };
   }, [user]);
 
@@ -441,7 +447,7 @@ export default function ProfileView({ user, language, hospitalSettings }: Profil
   };
 
   // Submit Leave Request
-  const handleSubmitLeave = (e: React.FormEvent) => {
+  const handleSubmitLeave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!leaveStart || !leaveEnd || !leaveReason) {
       alert(isAr ? "يرجى تعبئة كامل حقول فترات تاريخ وسبب الإجازة" : "Please fill in leave dates & cause");
@@ -460,20 +466,21 @@ export default function ProfileView({ user, language, hospitalSettings }: Profil
       timestampMs: Date.now()
     };
 
-    const overallList = JSON.parse(localStorage.getItem("baheya_leave_requests") || "[]");
-    overallList.push(newReq);
-    localStorage.setItem("baheya_leave_requests", JSON.stringify(overallList));
-    setMyLeavesList(prev => [newReq, ...prev]);
-
-    setLeaveStart("");
-    setLeaveEnd("");
-    setLeaveReason("");
-    setLeavePhone("");
-    alert(isAr ? "✔ تم إرسال طلب الإجازة بنجاح وتوجيهه لبلدية الموارد البشرية وإدارة الكوادر!" : "✔ Leave request submitted successfully!");
+    try {
+      await saveLeaveRequest(newReq);
+      setLeaveStart("");
+      setLeaveEnd("");
+      setLeaveReason("");
+      setLeavePhone("");
+      alert(isAr ? "✔ تم إرسال طلب الإجازة بنجاح ومزامنته مع السحابة فورياً!" : "✔ Leave request submitted & synchronized successfully!");
+    } catch (err) {
+      console.error(err);
+      alert(isAr ? "🛑 خطأ في الاتصال ومزامنة طلب الإجازة" : "🛑 Error syncing leave request to cloud");
+    }
   };
 
   // Submit Administrative Request
-  const handleSubmitAdminReq = (e: React.FormEvent) => {
+  const handleSubmitAdminReq = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!requestDetails.trim()) {
       alert(isAr ? "يرجى كتابة تفاصيل الطلب السريري أو النقل" : "Please describe details of the request");
@@ -490,14 +497,15 @@ export default function ProfileView({ user, language, hospitalSettings }: Profil
       timestampMs: Date.now()
     };
 
-    const overallList = JSON.parse(localStorage.getItem("baheya_admin_requests") || "[]");
-    overallList.push(newReq);
-    localStorage.setItem("baheya_admin_requests", JSON.stringify(overallList));
-    setMyAdminReqList(prev => [newReq, ...prev]);
-
-    setRequestDetails("");
-    setRequestPrefWard("");
-    alert(isAr ? "✔ تم توجيه السجل الإداري وتوثيقه بلوحة إدارة عمليات المستشفى!" : "✔ Admin request forwarded to CNO operations!");
+    try {
+      await saveAdminRequest(newReq);
+      setRequestDetails("");
+      setRequestPrefWard("");
+      alert(isAr ? "✔ تم رفع وتوثيق الطلب الإداري ومزامنته سحابياً فورياً!" : "✔ Admin request submitted & synchronized successfully!");
+    } catch (err) {
+      console.error(err);
+      alert(isAr ? "🛑 خطأ في الاتصال ومزامنة الطلب الإداري" : "🛑 Error syncing admin request to cloud");
+    }
   };
 
   const getLeaveTypeAr = (t: string) => {

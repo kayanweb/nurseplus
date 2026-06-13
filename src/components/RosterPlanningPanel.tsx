@@ -28,7 +28,7 @@ import {
   Layers,
   FileCheck
 } from "lucide-react";
-import { saveDepartmentRoster } from "../lib/firestoreService";
+import { saveDepartmentRoster, saveSetting, syncSetting } from "../lib/firestoreService";
 
 // Standard Types for Roster System
 interface SystemUser {
@@ -248,6 +248,7 @@ export default function RosterPlanningPanel({
   const handleSaveSettings = (updated: RosterGeneralSettings) => {
     setSettings(updated);
     localStorage.setItem("baheya_roster_general_settings", JSON.stringify(updated));
+    saveSetting("baheya_roster_general_settings", updated).catch(err => console.error(err));
     if (addSystemLog) {
       addSystemLog("تم حفظ وتحديث إعدادات الروستر العامة", "success");
     }
@@ -280,6 +281,7 @@ export default function RosterPlanningPanel({
   const saveOverrides = (list: LimitOverrideRecord[]) => {
     setOverridesList(list);
     localStorage.setItem("baheya_roster_overrides", JSON.stringify(list));
+    saveSetting("baheya_roster_overrides", list).catch(err => console.error(err));
   };
 
   // Overrides Form states
@@ -406,6 +408,7 @@ export default function RosterPlanningPanel({
   const saveAttendance = (state: AttendanceState) => {
     setAttendanceTable(state);
     localStorage.setItem("baheya_daily_attendance", JSON.stringify(state));
+    saveSetting("baheya_daily_attendance", state).catch(err => console.error(err));
   };
 
   // Date Filtering Controls (Flexible Multi-choice)
@@ -429,6 +432,40 @@ export default function RosterPlanningPanel({
       { nameAr: "أرقام الوردية المزدوجة", nameEn: "Double Shift Keydays", days: ["1", "5", "10", "15"] }
     ];
   });
+
+  // Real-time synchronization of Roster Settings, Overrides, Attendance and Templates from Firestore
+  useEffect(() => {
+    const unsubSettings = syncSetting("baheya_roster_general_settings", (data) => {
+      if (data && data.value) {
+        setSettings(data.value);
+      }
+    });
+
+    const unsubOverrides = syncSetting("baheya_roster_overrides", (data) => {
+      if (data && data.value) {
+        setOverridesList(data.value);
+      }
+    });
+
+    const unsubAttendance = syncSetting("baheya_daily_attendance", (data) => {
+      if (data && data.value) {
+        setAttendanceTable(data.value);
+      }
+    });
+
+    const unsubFavTemplates = syncSetting("baheya_favorite_days_templates", (data) => {
+      if (data && data.value) {
+        setSavedTemplates(data.value);
+      }
+    });
+
+    return () => {
+      unsubSettings();
+      unsubOverrides();
+      unsubAttendance();
+      unsubFavTemplates();
+    };
+  }, []);
 
   const [newTemplateNameAr, setNewTemplateNameAr] = useState("");
   const [newTemplateNameEn, setNewTemplateNameEn] = useState("");
@@ -454,6 +491,7 @@ export default function RosterPlanningPanel({
     const updated = [...savedTemplates, template];
     setSavedTemplates(updated);
     localStorage.setItem("baheya_favorite_days_templates", JSON.stringify(updated));
+    saveSetting("baheya_favorite_days_templates", updated).catch(err => console.error(err));
     setNewTemplateNameAr("");
     setNewTemplateNameEn("");
     alert(isAr ? "💾 تم حفظ قالب الأيام المفضل بنجاح!" : "💾 Favorite days configuration saved successfully!");
@@ -470,6 +508,7 @@ export default function RosterPlanningPanel({
       const next = savedTemplates.filter((_, i) => i !== idx);
       setSavedTemplates(next);
       localStorage.setItem("baheya_favorite_days_templates", JSON.stringify(next));
+      saveSetting("baheya_favorite_days_templates", next).catch(err => console.error(err));
     }
   };
 
@@ -1639,8 +1678,7 @@ export default function RosterPlanningPanel({
                 };
 
                 const nextList = [newRecord, ...overridesList];
-                setOverridesList(nextList);
-                localStorage.setItem("baheya_roster_overrides", JSON.stringify(nextList));
+                saveOverrides(nextList);
                 
                 if (addSystemLog) {
                   addSystemLog(`توقيع ترخيص استثنائي للحد الأدنى المسموح للكادر (${user.nameAr}) - الحد الأدنى يصبح ${currentShifts} شيفت.`, "success");

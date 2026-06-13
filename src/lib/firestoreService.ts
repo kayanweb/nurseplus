@@ -886,6 +886,81 @@ export async function deleteCQIDecisionLog(logId: string): Promise<void> {
   }
 }
 
+// 20. Leave Requests (Real-time)
+export function syncLeaveRequests(onData: (data: any[]) => void) {
+  const path = "baheya_leave_requests";
+  return onSnapshot(
+    collection(db, path),
+    (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((doc) => {
+        list.push(doc.data());
+      });
+      list.sort((a, b) => (b.timestampMs || 0) - (a.timestampMs || 0));
+      onData(list);
+    },
+    (error) => {
+      handleFirestoreError(error, OperationType.LIST, path);
+    }
+  );
+}
+
+export async function saveLeaveRequest(req: any): Promise<void> {
+  const path = `baheya_leave_requests/${req.id}`;
+  try {
+    await setDoc(doc(db, "baheya_leave_requests", req.id), req);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export async function deleteLeaveRequest(id: string): Promise<void> {
+  const path = `baheya_leave_requests/${id}`;
+  try {
+    await deleteDoc(doc(db, "baheya_leave_requests", id));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
+// 21. Administrative Requests (Real-time)
+export function syncAdminRequests(onData: (data: any[]) => void) {
+  const path = "baheya_admin_requests";
+  return onSnapshot(
+    collection(db, path),
+    (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((doc) => {
+        list.push(doc.data());
+      });
+      list.sort((a, b) => (b.timestampMs || 0) - (a.timestampMs || 0));
+      onData(list);
+    },
+    (error) => {
+      handleFirestoreError(error, OperationType.LIST, path);
+    }
+  );
+}
+
+export async function saveAdminRequest(req: any): Promise<void> {
+  const path = `baheya_admin_requests/${req.id}`;
+  try {
+    await setDoc(doc(db, "baheya_admin_requests", req.id), req);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export async function deleteAdminRequest(id: string): Promise<void> {
+  const path = `baheya_admin_requests/${id}`;
+  try {
+    await deleteDoc(doc(db, "baheya_admin_requests", id));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
+
 
 
 

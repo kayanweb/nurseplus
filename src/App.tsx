@@ -50,7 +50,8 @@ import {
   Cloud,
   Mail,
   Key,
-  Save
+  Save,
+  Coffee
 } from "lucide-react";
 import { 
   GoogleAuthProvider, 
@@ -87,10 +88,15 @@ import MedicalToolsSuite from "./components/MedicalToolsSuite";
 import NursingAdminToolbox from "./components/NursingAdminToolbox";
 import SupervisorDashboard from "./components/SupervisorDashboard";
 import MedicationLedger from "./components/MedicationLedger";
+import MealsDeliveryLog from "./components/MealsDeliveryLog";
 import CloudSettingsPage from "./components/CloudSettingsPage";
 import RosterPlanningPanel from "./components/RosterPlanningPanel";
 import UserApprovalDashboard from "./components/UserApprovalDashboard";
 import QualityAnalyticsHub from "./components/QualityAnalyticsHub";
+import NursingDirectorDashboard from "./components/NursingDirectorDashboard";
+import NursingSupervisorDashboard from "./components/NursingSupervisorDashboard";
+import HeadNurseDashboard from "./components/HeadNurseDashboard";
+import PatientTransportLog from "./components/PatientTransportLog";
 import { FORM_TEMPLATES, createNewRecord, getItemsForTemplate } from "./data/templates";
 import { generatePDF } from "./lib/pdfGenerator";
 import {
@@ -756,7 +762,7 @@ function AppContent() {
   const [userRegistrySearch, setUserRegistrySearch] = useState("");
   const [userRegistryPage, setUserRegistryPage] = useState(0);
   const [dbStatus, setDbStatus] = useState<"connected" | "syncing" | "error">("connected");
-  const [activeTab, setActiveTab] = useState<"editor" | "history" | "settings" | "login_settings" | "about" | "analytics" | "duty" | "it_panel" | "distribution" | "roster" | "messaging" | "cloud_settings" | "roster_config" | "approval" | "profile" | "medical_tools" | "nursing_toolbox" | "supervisor" | "medication_ledger">("duty");
+  const [activeTab, setActiveTab] = useState<"editor" | "history" | "settings" | "login_settings" | "about" | "analytics" | "duty" | "it_panel" | "distribution" | "roster" | "messaging" | "cloud_settings" | "roster_config" | "approval" | "profile" | "medical_tools" | "nursing_toolbox" | "supervisor" | "medication_ledger" | "meals" | "director_dashboard" | "supervisor_dashboard" | "headnurse_dashboard" | "transport">("duty");
   const [ledgerViewMode, setLedgerViewMode] = useState<"weekly" | "monthly">("weekly");
   const [dayFocus, setDayFocus] = useState<"all" | number>("all"); // Show all 31 days or focus on a single day
   const [language, setLanguage] = useState<"ar" | "en">("ar");
@@ -4810,6 +4816,81 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
             </button>
           )}
 
+          {/* Meals Delivery Log */}
+          {(canConfigureRoster || isSupervisor) && (
+            <button
+              onClick={() => setActiveTab("meals")}
+              className={`w-full flex items-center gap-3 px-6 py-3 text-right text-xs font-semibold transition-all border-l-4 ${
+                activeTab === "meals"
+                  ? "bg-slate-800 border-orange-500 text-orange-400 font-bold shadow-md"
+                  : "border-transparent text-slate-400 hover:bg-slate-850 hover:text-white hover:border-orange-900"
+              }`}
+            >
+              <Coffee className={`h-4 w-4 shrink-0 ${activeTab === "meals" ? "text-orange-400" : "text-slate-500"}`} />
+              <span className="flex-1">{language === "ar" ? "شيت وجبات المرضى والموظفين" : "Meals & Nutrition"}</span>
+              <span className="bg-orange-500 text-white text-[8px] px-1.5 py-0.5 rounded-full font-bold">MEALS</span>
+            </button>
+          )}
+
+          {/* Transportation Log */}
+          {(canConfigureRoster || isSupervisor || currentUser.role === "admin") && (
+            <button
+              onClick={() => setActiveTab("transport")}
+              className={`w-full flex items-center gap-3 px-6 py-3 text-right text-xs font-semibold transition-all border-l-4 ${
+                activeTab === "transport"
+                  ? "bg-slate-800 border-indigo-500 text-indigo-400 font-bold shadow-md"
+                  : "border-transparent text-slate-400 hover:bg-slate-850 hover:text-white hover:border-indigo-900"
+              }`}
+            >
+              <ArrowLeftRight className={`h-4 w-4 shrink-0 ${activeTab === "transport" ? "text-indigo-400" : "text-slate-500"}`} />
+              <span className="flex-1">{language === "ar" ? "حركة نقل المرضى" : "Patient Transport"}</span>
+              <span className="bg-indigo-500 text-white text-[8px] px-1.5 py-0.5 rounded-full font-bold">MOVE</span>
+            </button>
+          )}
+
+          {/* Role-Specific Master Dashboards */}
+          {(currentUser.role === "admin" || currentUser.role === "cno" || currentUser.role === "president" || currentUser.role === "quality") && (
+            <button
+              onClick={() => setActiveTab("director_dashboard")}
+              className={`w-full flex items-center gap-3 px-6 py-3 text-right text-xs font-semibold transition-all border-l-4 ${
+                activeTab === "director_dashboard"
+                  ? "bg-slate-800 border-indigo-500 text-indigo-400 font-bold shadow-md"
+                  : "border-transparent text-slate-400 hover:bg-slate-850 hover:text-white hover:border-indigo-900"
+              }`}
+            >
+              <TrendingUp className={`h-4 w-4 shrink-0 ${activeTab === "director_dashboard" ? "text-indigo-400" : "text-slate-500"}`} />
+              <span className="flex-1">{language === "ar" ? "شاشة الإدارة العليا CNO" : "Director & CNO Dashboard"}</span>
+            </button>
+          )}
+
+          {(currentUser.role === "admin" || currentUser.role === "supervisor" || currentUser.role === "quality") && (
+            <button
+              onClick={() => setActiveTab("supervisor_dashboard")}
+              className={`w-full flex items-center gap-3 px-6 py-3 text-right text-xs font-semibold transition-all border-l-4 ${
+                activeTab === "supervisor_dashboard"
+                  ? "bg-slate-800 border-emerald-500 text-emerald-400 font-bold shadow-md"
+                  : "border-transparent text-slate-400 hover:bg-slate-850 hover:text-white hover:border-emerald-900"
+              }`}
+            >
+              <Activity className={`h-4 w-4 shrink-0 ${activeTab === "supervisor_dashboard" ? "text-emerald-400" : "text-slate-500"}`} />
+              <span className="flex-1">{language === "ar" ? "إشراف أرضي وتوجيه سريع" : "Supervisor Floor Dashboard"}</span>
+            </button>
+          )}
+
+          {(currentUser.role === "admin" || currentUser.role === "head_nurse" || currentUser.role === "supervisor" || currentUser.role === "quality") && (
+            <button
+              onClick={() => setActiveTab("headnurse_dashboard")}
+              className={`w-full flex items-center gap-3 px-6 py-3 text-right text-xs font-semibold transition-all border-l-4 ${
+                activeTab === "headnurse_dashboard"
+                  ? "bg-slate-800 border-pink-500 text-pink-400 font-bold shadow-md"
+                  : "border-transparent text-slate-400 hover:bg-slate-850 hover:text-white hover:border-pink-900"
+              }`}
+            >
+              <Users className={`h-4 w-4 shrink-0 ${activeTab === "headnurse_dashboard" ? "text-pink-400" : "text-slate-500"}`} />
+              <span className="flex-1">{language === "ar" ? "إدارة القسم والكارديكس" : "Head Nurse Ward Config"}</span>
+            </button>
+          )}
+
           {/* 3. Analytics Hub */}
           {isSupervisor && (
           <button
@@ -5221,7 +5302,7 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
         <main className="p-4 sm:p-6 flex-1 flex flex-col gap-6 overflow-y-auto print:overflow-visible print:h-auto print:p-0 print:m-0 custom-main-scroll" id="main-content-dashboard">
           
           {/* Quick Informative Statistics summary cards */}
-          <div className="no-print grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="hidden">
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
               <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-sans mb-1">
                 {language === "ar" ? "السجلات الإجمالية المحفوظة" : "Saved Archived Logs"}
@@ -5696,7 +5777,7 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                           (d) => d.date === todayString && d.department === effectiveDutyDept
                         );
                         const todayEmergencyTeam = emergencyTeams.find(
-                          (t) => d => false || t.date === todayString
+                          (t) => t.date === todayString
                         );
 
                         const hasDuties = todayDutyAssignment && todayDutyAssignment.assignedStaffIds?.length > 0;
@@ -5726,10 +5807,18 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                                     {todayDutyAssignment.assignedStaffIds.map((id: string) => {
                                       const u = systemUsers.find(usr => usr.id === id);
                                       if (!u) return null;
+                                      const task = todayDutyAssignment.assignedTasks && todayDutyAssignment.assignedTasks[u.id] ? todayDutyAssignment.assignedTasks[u.id] : "";
                                       return (
-                                        <span key={id} className="inline-flex items-center gap-1 bg-white border border-slate-200 text-slate-800 text-[10px] font-bold px-2 py-1 rounded-lg shadow-sm">
-                                          <span className="w-1.5 h-1.5 rounded-full bg-indigo-505 bg-indigo-500"></span>
-                                          {language === "ar" ? u.nameAr : u.nameEn} (ID: {u.staffId})
+                                        <span key={id} className="inline-flex items-center gap-1.5 bg-white border border-slate-200 text-slate-800 text-[10px] font-bold px-2 py-1 rounded-lg">
+                                          <div className="flex items-center gap-1">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                                            {language === "ar" ? u.nameAr : u.nameEn}
+                                          </div>
+                                          {task && (
+                                            <span className="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-black border border-indigo-100">
+                                              {task}
+                                            </span>
+                                          )}
                                         </span>
                                       );
                                     })}
@@ -7122,26 +7211,25 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                           </div>
 
                           {/* Signatures row replica */}
-                          <div className="grid grid-cols-3 gap-6 pt-10 text-center avoid-break text-xs text-slate-800 print:text-black">
-                            <div className="border-t-2 border-slate-900 pt-2 space-y-1">
-                              <span className="font-extrabold">{language === "ar" ? "المستلم ومحضر ممرض القسم" : "Prepared Nurse / Officer:"}</span>
-                              <div className="h-4"></div>
-                              <div className="text-[10px] text-slate-600 font-bold">{editingRecord.staffName || "............................"}</div>
-                              <div className="text-[9px] text-slate-400 font-mono">ID: {editingRecord.staffId || "....."}</div>
+                          <div className="flex flex-row items-end justify-between pt-12 avoid-break text-xs text-slate-800 print:text-black w-full font-bold">
+                            <div className="flex items-end flex-wrap">
+                              <span>{language === "ar" ? "المستلم ومحضر ممرض القسم:" : "Prepared Nurse / Officer:"}</span>
+                              <span className="inline-flex flex-col items-center justify-end w-32 border-b-2 border-dotted border-slate-800 mx-2 pb-0.5 text-center text-[9px]">
+                                <span>{editingRecord.staffName || ""}</span>
+                                {editingRecord.staffId && <span className="text-[8px] font-mono">ID: {editingRecord.staffId}</span>}
+                              </span>
                             </div>
-                            <div className="border-t-2 border-slate-900 pt-2 space-y-1">
-                              <span className="font-extrabold">{language === "ar" ? "رئيسة التمريض للقسم" : "Checked Head Nurse:"}</span>
-                              <div className="h-6"></div>
-                              <div className="text-[10px] text-slate-400 font-bold">................................................</div>
+                            <div className="flex items-end flex-wrap">
+                              <span>{language === "ar" ? "رئيسة التمريض للقسم:" : "Checked Head Nurse:"}</span>
+                              <span className="inline-block w-40 border-b-2 border-dotted border-slate-800 mx-2 pb-0.5"></span>
                             </div>
-                            <div className="border-t-2 border-slate-900 pt-2 space-y-1">
-                              <span className="font-extrabold">{language === "ar" ? "مراقب الجودة والتنمية" : "Hospital Quality Controller:"}</span>
-                              <div className="h-6"></div>
-                              <div className="text-[10px] text-slate-400 border border-transparent">
+                            <div className="flex items-end flex-wrap">
+                              <span>{language === "ar" ? "مراقب الجودة والتنمية:" : "Hospital Quality Controller:"}</span>
+                              <span className="inline-block min-w-40 border-b-2 border-dotted border-slate-800 mx-2 pb-0.5 text-[9px] text-center">
                                 {editingRecord.additionalInfo?.isQualityCertified 
                                   ? (language === "ar" ? `معتمد: ${editingRecord.additionalInfo.certifiedBy}` : `Certified: ${editingRecord.additionalInfo.certifiedBy}`)
-                                  : "................................................"}
-                              </div>
+                                  : ""}
+                              </span>
                             </div>
                           </div>
 
@@ -8306,6 +8394,26 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                 onViewUserProfile={setViewingUserProfileUser}
               />
             </div>
+          )}
+
+          {activeTab === "meals" && (
+            <MealsDeliveryLog language={language} rosterList={rosterList} departments={departments} />
+          )}
+
+          {activeTab === "transport" && (
+            <PatientTransportLog language={language} />
+          )}
+
+          {activeTab === "director_dashboard" && (
+            <NursingDirectorDashboard language={language} />
+          )}
+
+          {activeTab === "supervisor_dashboard" && (
+            <NursingSupervisorDashboard language={language} />
+          )}
+
+          {activeTab === "headnurse_dashboard" && (
+            <HeadNurseDashboard language={language} />
           )}
 
 {activeTab === "roster" && (() => {
@@ -9696,27 +9804,22 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                   </div>
 
                   {/* Print layout signature block */}
-                  <div className="hidden print:block p-8 border-t border-slate-300 mt-20 text-xs font-sans text-right">
-                    <div className="grid grid-cols-3 gap-8 text-center">
-                      <div className="space-y-4">
-                        <p className="font-extrabold text-slate-800">توقيع رئيسة تمريض القسم</p>
-                        <div className="h-10 border-b border-slate-300 w-2/3 mx-auto" />
-                        <p className="text-[10px] text-slate-500">التاريخ:     /     / 2026</p>
-                      </div>
-                      <div className="space-y-4">
-                        <p className="font-extrabold text-slate-800">توقيع أ. فاطمة الزهراء (رئيسة تمريض المستشفى CNO)</p>
-                        <div className="h-10 border-b border-emerald-300 w-2/3 mx-auto flex items-center justify-center text-xs text-emerald-700 font-bold">
-                          {cnoApproved ? `✓ معتمد ومعزز رقمياً في ${cnoApprovalDate}` : "بانتظار اتمام الاعتماد"}
-                        </div>
-                        <p className="text-[10px] text-slate-500">التاريخ:     /     / 2026</p>
-                      </div>
-                      <div className="space-y-4">
-                        <p className="font-extrabold text-slate-800">موافقة وتوقيع د. محمد السيد (المدير العام)</p>
-                        <div className="h-10 border-b border-rose-300 w-2/3 mx-auto flex items-center justify-center text-xs text-rose-700 font-bold">
-                          {directorApproved ? `✓ معتمد ومعزز رقمياً في ${directorApprovalDate}` : "بانتظار اتمام الاعتماد من المدير"}
-                        </div>
-                        <p className="text-[10px] text-slate-500">{language === "ar" ? hospitalSettings.nameAr : hospitalSettings.nameEn}</p>
-                      </div>
+                  <div className="hidden print:flex flex-row items-end justify-between pt-16 avoid-break text-[11px] text-slate-800 print:text-black w-full font-bold">
+                    <div className="flex items-end">
+                      <span>توقيع رئيسة تمريض القسم:</span>
+                      <span className="inline-block w-40 border-b-2 border-dotted border-slate-800 mx-2"></span>
+                    </div>
+                    <div className="flex items-end">
+                      <span>توقيع أ. فاطمة الزهراء (رئيسة تمريض المستشفى CNO):</span>
+                      <span className="inline-block min-w-40 border-b-2 border-dotted border-slate-800 mx-2 text-[10px] text-center pb-0.5">
+                        {cnoApproved ? `✓ معتمد ومعزز رقمياً في ${cnoApprovalDate}` : ""}
+                      </span>
+                    </div>
+                    <div className="flex items-end">
+                      <span>موافقة وتوقيع د. محمد السيد (المدير العام):</span>
+                      <span className="inline-block min-w-40 border-b-2 border-dotted border-slate-800 mx-2 text-[10px] text-center pb-0.5">
+                        {directorApproved ? `✓ معتمد ومعزز رقمياً في ${directorApprovalDate}` : ""}
+                      </span>
                     </div>
                   </div>
                 </div>

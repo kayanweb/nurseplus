@@ -27,6 +27,10 @@ import {
 } from "lucide-react";
 import { db } from "../firebase";
 import { AppUser } from "../types";
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
+  PieChart, Pie, Cell
+} from 'recharts';
 
 interface SupervisorDashboardProps {
   language: "ar" | "en";
@@ -65,6 +69,7 @@ export default function SupervisorDashboard({
   const [selectedDate, setSelectedDate] = useState<string>(getTodayString);
   const [selectedDutyDept, setSelectedDutyDept] = useState<string>(departments[0] || "EMERGENCY UNIT");
   const [selectedStaffIdForDuty, setSelectedStaffIdForDuty] = useState<string>("");
+  const [selectedStaffDutyRole, setSelectedStaffDutyRole] = useState<string>("");
   const [dutySearchQuery, setDutySearchQuery] = useState<string>("");
   const [copyStatus, setCopyStatus] = useState<boolean>(false);
   
@@ -110,6 +115,7 @@ export default function SupervisorDashboard({
 
     const existingAssignedIds = currentDutyAssignment?.assignedStaffIds || [];
     const existingAssignedNames = currentDutyAssignment?.assignedStaffNames || [];
+    const existingTasks = currentDutyAssignment?.assignedTasks ? { ...currentDutyAssignment.assignedTasks } : {};
 
     if (existingAssignedIds.includes(staff.id)) {
       alert(isAr ? "هذا الموظف مضاف بالفعل لهذه المناوبة اليومية!" : "This employee is already assigned to this daily shift!");
@@ -120,6 +126,13 @@ export default function SupervisorDashboard({
     // Keep names in both formats for clarity
     const nameStr = `${staff.nameAr} (${staff.nameEn})`;
     const updatedNames = [...existingAssignedNames, nameStr];
+    
+    // Assign specific duty
+    if (selectedStaffDutyRole) {
+      existingTasks[staff.id] = selectedStaffDutyRole;
+    } else {
+      existingTasks[staff.id] = isAr ? "جرد روتيني" : "Routine Ward Duty";
+    }
 
     const newAssignment = {
       id: currentDutyAssignment?.id || `${selectedDate}_${selectedDutyDept}_duty`,
@@ -127,6 +140,7 @@ export default function SupervisorDashboard({
       department: selectedDutyDept,
       assignedStaffIds: updatedIds,
       assignedStaffNames: updatedNames,
+      assignedTasks: existingTasks,
       assignedBy: currentUser.nameAr || currentUser.nameEn || "Supervisor",
       updatedAt: new Date().toISOString()
     };
@@ -134,9 +148,10 @@ export default function SupervisorDashboard({
     try {
       await saveDailyDuty(newAssignment);
       setSelectedStaffIdForDuty("");
+      setSelectedStaffDutyRole("");
     } catch (err) {
       console.error(err);
-      alert("Error saving study assignment to Cloud Firestore.");
+      alert("Error saving duty assignment to Cloud Firestore.");
     }
   };
 
@@ -148,11 +163,14 @@ export default function SupervisorDashboard({
 
     const updatedIds = currentDutyAssignment.assignedStaffIds.filter((id: string) => id !== staffId);
     const updatedNames = currentDutyAssignment.assignedStaffNames.filter((_: any, i: number) => i !== idx);
+    const existingTasks = { ...(currentDutyAssignment.assignedTasks || {}) };
+    delete existingTasks[staffId];
 
     const updatedAssignment = {
       ...currentDutyAssignment,
       assignedStaffIds: updatedIds,
       assignedStaffNames: updatedNames,
+      assignedTasks: existingTasks,
       assignedBy: currentUser.nameAr || currentUser.nameEn || "Supervisor",
       updatedAt: new Date().toISOString()
     };
@@ -420,6 +438,20 @@ export default function SupervisorDashboard({
                 </div>
               </div>
 
+              {/* TASK ASSIGNMENT */}
+              <div className="space-y-1 pt-2">
+                <label className="text-[10px] font-black text-slate-500 block">
+                  {isAr ? "المهام المحددة (مثال: كراش كارت، غرف 1-4، الخ...):" : "Specific Duty/Role (e.g. Crash Cart, Beds 1-5):"}
+                </label>
+                <input
+                  type="text"
+                  placeholder={isAr ? "اكتب المهام الموكلة للممرض/الموظف" : "Enter designated tasks..."}
+                  value={selectedStaffDutyRole}
+                  onChange={(e) => setSelectedStaffDutyRole(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:bg-white focus:border-indigo-500"
+                />
+              </div>
+
               {/* SAVE ACTION BUTTON */}
               <button
                 onClick={handleAddStaffToDuty}
@@ -452,28 +484,34 @@ export default function SupervisorDashboard({
                   {currentDutyAssignment.assignedStaffIds.map((id: string, index: number) => {
                     const matchedUser = systemUsers.find(u => u.id === id);
                     const displayName = currentDutyAssignment.assignedStaffNames?.[index] || (isAr ? "موظف مجهول" : "Staff User");
+                    const task = currentDutyAssignment.assignedTasks && currentDutyAssignment.assignedTasks[id] ? currentDutyAssignment.assignedTasks[id] : (isAr ? "جرد روتيني" : "Routine Ward Duty");
+                    
                     return (
                       <div 
                         key={id} 
-                        className="p-3 border border-slate-200 rounded-xl bg-slate-50 flex items-center justify-between hover:bg-slate-50 transition-all text-right"
+                        className="p-3 border border-slate-200 rounded-xl bg-slate-50 flex items-center justify-between hover:bg-slate-50 transition-all text-right group"
                       >
                         <div className="flex items-center gap-3 min-w-0 flex-1">
                           <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold shrink-0">
                             {matchedUser?.nameEn ? matchedUser.nameEn.charAt(0) : "N"}
                           </div>
-                          <div className="min-w-0">
-                            <span className="text-xs font-black text-slate-800 block truncate" title={displayName}>
+                          <div className="min-w-0 flex flex-col items-start w-full">
+                            <span className="text-xs font-black text-slate-800 block truncate w-full" title={displayName}>
                               {matchedUser ? (isAr ? matchedUser.nameAr : matchedUser.nameEn) : displayName}
                             </span>
                             <span className="text-[9px] text-slate-500 font-mono block">
                               ID: {matchedUser?.staffId || "N/A"} | {matchedUser?.role || "Staff Nurse"}
                             </span>
+                            <div className="mt-1 flex items-center gap-1 bg-white border border-indigo-100 text-[10px] text-indigo-700 font-bold px-1.5 py-0.5 rounded w-fit">
+                              <CheckSquare className="h-2.5 w-2.5 text-indigo-500" />
+                              <span className="truncate max-w-[120px]" title={task}>{task}</span>
+                            </div>
                           </div>
                         </div>
 
                         <button
                           onClick={() => handleRemoveStaffFromDuty(id)}
-                          className="p-1 px-2 border border-rose-250 text-rose-600 hover:bg-rose-50 rounded-lg text-[10px] font-bold transition-all shrink-0"
+                          className="p-1 px-2 border border-rose-250 text-rose-600 hover:bg-rose-50 rounded-lg text-[10px] font-bold transition-all shrink-0 opacity-0 group-hover:opacity-100"
                           title={isAr ? "إزالة من جرد اليوم" : "Remove Assignment"}
                         >
                           {isAr ? "إزالة" : "Revoke"}
@@ -859,60 +897,215 @@ export default function SupervisorDashboard({
 
       {/* ==================== SUB-TAB 3: ROUNDING & STATS (ORIGINAL) ==================== */}
       {activeSubTab === "rounding" && (
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-          <h3 className="font-semibold text-lg">{isAr ? "جولات المرور والتفتيش اليومية اليوم" : "Daily Patient Rounds & Audit Logs"}</h3>
-          <p className="text-xs text-slate-500">{isAr ? "قم بتفقد الأقسام، جودة الرعاية، وتوفر التجهيزات مع الممرضين العاملين." : "Inspect wards, care quality, and equipment availability with active staff."}</p>
+        <div className="space-y-6">
+          <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-lg border border-slate-700">
+            <h3 className="font-black text-xl tracking-tight">{isAr ? "نظام الجولات التفتيشية الإكلينيكية الذكي" : "Clinical Rounds & Intelligent Audit System"}</h3>
+            <p className="text-xs text-slate-400 mt-2">{isAr ? "تفتيش ومراجعة كفاءة الأقسام والسجلات السريرية بشكل مدروس وباعتماد مباشر لإدارة التمريض العليا." : "Complete structured clinical rounds and validate ward compliance standards instantly."}</p>
+          </div>
           
-          <div className="border rounded-xl divide-y divide-slate-100">
-            {audits.map(audit => (
-              <button 
-                key={audit.id} 
-                onClick={() => toggleAudit(audit.id)} 
-                className="flex justify-between items-center p-3.5 hover:bg-slate-50 rounded text-right w-full transition duration-150"
-              >
-                <div className="flex items-center gap-2">
-                  {audit.status === "audited" ? <CheckSquare className="text-emerald-500 h-4 w-4 shrink-0" /> : <AlertTriangle className="text-amber-500 h-4 w-4 shrink-0" />}
-                  <span className="text-xs font-bold text-slate-800">{isAr ? audit.nameAr : audit.nameEn}</span>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* Audits sidebar */}
+            <div className="lg:col-span-1 space-y-4">
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                <h4 className="text-xs font-black text-slate-800 mb-3 uppercase tracking-wider">{isAr ? "الوحدات المستهدفة للتفتيش اليوم" : "Targeted Wards for Today"}</h4>
+                <div className="space-y-2 border-t border-slate-100 pt-3">
+                  {audits.map(audit => (
+                    <button 
+                      key={audit.id} 
+                      onClick={() => toggleAudit(audit.id)} 
+                      className={`flex justify-between items-center p-3 rounded-xl border text-right w-full transition duration-150 ${
+                        audit.status === "audited" ? "bg-emerald-50/50 border-emerald-100 hover:bg-emerald-50" : "bg-white border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        {audit.status === "audited" ? <CheckSquare className="text-emerald-500 h-5 w-5 shrink-0" /> : <AlertTriangle className="text-amber-500 h-5 w-5 shrink-0" />}
+                        <div className="space-y-0.5">
+                          <span className="text-xs font-bold text-slate-800 block">{isAr ? audit.nameAr : audit.nameEn}</span>
+                          <span className="text-[9px] text-slate-500 block font-mono">{audit.status.toUpperCase()}</span>
+                        </div>
+                      </div>
+                      <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg ${
+                        audit.status === "audited" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                      }`}>
+                        {audit.status === "audited" ? (isAr ? "مكتمل" : "Complete") : (isAr ? "مطلوب" : "Required")}
+                      </span>
+                    </button>
+                  ))}
                 </div>
-                <span className={`text-[10px] font-black px-2 py-0.5 rounded ${
-                  audit.status === "audited" ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"
-                }`}>
-                  {audit.status === "audited" ? (isAr ? "تم المرور والتفتيش" : "Audited") : (isAr ? "بانتظار المرور" : "Pending Audit")}
-                </span>
-              </button>
-            ))}
+              </div>
+            </div>
+
+            {/* Checklist Main Area */}
+            <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+              <div className="flex items-center justify-between border-b pb-4 border-slate-100">
+                <div className="flex items-center gap-3">
+                  <span className="bg-indigo-100 text-indigo-700 p-2 rounded-xl">
+                    <ClipboardCheck className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <h3 className="font-black text-sm text-slate-900">{isAr ? "استمارة المرور السريرية النشطة" : "Active Clinical Round Form"}</h3>
+                    <p className="text-[10px] text-slate-500">{isAr ? "نموذج توثيق جولات المشرف العام للأقسام المحددة" : "Supervisor standard checklist for active ward."}</p>
+                  </div>
+                </div>
+                <div className="text-[10px] font-mono bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg font-bold">
+                  {selectedDate}
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                
+                {/* Metric 1 */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-800 flex justify-between">
+                    <span>{isAr ? "1. الالتزام بالمعايير البيئية ومكافحة العدوى" : "1. Infection Control & Environmental Standards"}</span>
+                    <span className="text-indigo-600 font-black">IC-101</span>
+                  </label>
+                  <p className="text-[10px] text-slate-500">{isAr ? "التأكد من نظافة الأسطح، توافر المطهرات، والتزام الطاقم بلبس الواقيات الشخصية." : "Verify surface cleanliness, sanitizer availability, and staff PPE adherence."}</p>
+                  <div className="flex gap-3 mt-2">
+                    <button className="flex-1 p-2 border border-emerald-200 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-bold hover:bg-emerald-100 transition-colors">
+                      {isAr ? "مستوفى كلياً" : "Fully Compliant"}
+                    </button>
+                    <button className="flex-1 p-2 border border-amber-200 bg-amber-50 text-amber-700 rounded-lg text-xs font-bold hover:bg-amber-100 transition-colors">
+                      {isAr ? "مستوفى جزئياً" : "Partial Compliant"}
+                    </button>
+                    <button className="flex-1 p-2 border border-red-200 bg-red-50 text-red-700 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors">
+                      {isAr ? "غير مستوفى" : "Non-Compliant"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Metric 2 */}
+                <div className="space-y-2 pt-4 border-t border-slate-100">
+                  <label className="text-xs font-bold text-slate-800 flex justify-between">
+                    <span>{isAr ? "2. سجلات المرضى والتسليم الدوائي" : "2. Patient Records & Medication Handover"}</span>
+                    <span className="text-indigo-600 font-black">MR-204</span>
+                  </label>
+                  <p className="text-[10px] text-slate-500">{isAr ? "التأكد من دقة تحديث السجلات وفحص أدوية الثلاجة والعربات الطارئة." : "Audit file updates and check fridge/crash cart inventory."}</p>
+                  <div className="flex gap-3 mt-2">
+                    <button className="flex-1 p-2 border border-emerald-200 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-bold hover:bg-emerald-100 transition-colors">
+                      {isAr ? "مستوفى كلياً" : "Fully Compliant"}
+                    </button>
+                    <button className="flex-1 p-2 border border-amber-200 bg-amber-50 text-amber-700 rounded-lg text-xs font-bold hover:bg-amber-100 transition-colors">
+                      {isAr ? "مستوفى جزئياً" : "Partial Compliant"}
+                    </button>
+                    <button className="flex-1 p-2 border border-red-200 bg-red-50 text-red-700 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors">
+                      {isAr ? "غير مستوفى" : "Non-Compliant"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-slate-100 space-y-2">
+                  <label className="text-[10px] font-black text-slate-800">{isAr ? "ملاحظات وتوصيات المشرف" : "Supervisor Notes & Recommendations"}</label>
+                  <textarea 
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs outline-none focus:border-indigo-500"
+                    rows={3}
+                    placeholder={isAr ? "سجل أي ملاحظات، أعطال تقنية، أو إرشادات للممرضين..." : "Log technical defects, guidelines, or corrective actions here..."}
+                  ></textarea>
+                </div>
+
+                <button className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-xl text-xs shadow-md transition-all">
+                  <Save className="h-4 w-4" />
+                  {isAr ? "اعتماد تسجيل الجولة التفتيشية" : "Submit & Authorize Round Log"}
+                </button>
+
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* ==================== SUB-TAB 4: ARCHIVE REPORT TEMPLATES (ORIGINAL) ==================== */}
+      {/* ==================== SUB-TAB 4: DATA ANALYTICS & REPORTS ==================== */}
       {activeSubTab === "reports" && (
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-          <h3 className="font-semibold text-lg">{isAr ? "تقارير وتقييمات الأداء الإشرافية" : "Supervisor Performance Reports"}</h3>
-          <p className="text-xs text-slate-500">{isAr ? "صياغة ورفع التقارير المعتمدة لمديرة الرعاية السريرية ببهية." : "Download custom compliance documents for the clinical director."}</p>
+        <div className="space-y-6">
+          <div className="bg-gradient-to-r from-slate-900 to-indigo-900 text-white p-5 rounded-2xl shadow-lg border border-slate-700">
+            <h3 className="font-black text-lg tracking-tight">{isAr ? "تحليلات البيانات وتقارير الأداء" : "Data Analytics & Performance Reports"}</h3>
+            <p className="text-xs text-indigo-200 mt-1">{isAr ? "مؤشرات الامتثال وتقارير أداء طواقم التمريض والأقسام السريرية." : "Compliance metrics and staff performance tracking across clinical wings."}</p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Chart 1: Compliance */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <h4 className="text-xs font-bold text-slate-800 mb-4">{isAr ? "نسبة إنجاز المهام والجرد حسب القسم" : "Task & Checklist Compliance by Wing (%)"}</h4>
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={[
+                    { name: 'ICU', value: 92 },
+                    { name: 'ER', value: 85 },
+                    { name: 'Chemo', value: 98 },
+                    { name: 'OR', value: 88 },
+                    { name: 'Ward 1', value: 95 },
+                  ]}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                    <XAxis dataKey="name" tick={{fontSize: 10}} axisLine={false} tickLine={false} />
+                    <YAxis tick={{fontSize: 10}} axisLine={false} tickLine={false} />
+                    <RechartsTooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '8px', fontSize: '10px'}} />
+                    <Bar dataKey="value" fill="#4f46e5" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Chart 2: Staff Distribution */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <h4 className="text-xs font-bold text-slate-800 mb-4">{isAr ? "توزيع طواقم التمريض على الورديات والمهام" : "Staff Distribution by Shift/Roles"}</h4>
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: isAr ? 'طوارئ وإنعاش' : 'Emergency & ER', value: 15 },
+                        { name: isAr ? 'أجنحة داخلية' : 'Inpatient Wards', value: 35 },
+                        { name: isAr ? 'تحضير كيماوي' : 'Chemo Prepn', value: 10 },
+                        { name: isAr ? 'رعاية مركزة' : 'ICU', value: 20 },
+                        { name: isAr ? 'إجازات/راحات' : 'Off / Leaves', value: 5 },
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {["#ef4444", "#3b82f6", "#10b981", "#8b5cf6", "#94a3b8"].map((color, index) => (
+                        <Cell key={`cell-${index}`} fill={color} />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip contentStyle={{borderRadius: '8px', fontSize: '10px'}} />
+                    <Legend wrapperStyle={{fontSize: '10px'}} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <button className="border p-4 rounded-xl flex items-center justify-between hover:bg-slate-50 transition duration-150">
-              <div className="flex items-center gap-3">
-                <FileText className="text-indigo-500 h-5 w-5"/>
-                <div className="text-right">
-                  <span className="block font-bold text-xs text-slate-800">{isAr ? "تقرير التمريض اليومي" : "Daily Nursing Report"}</span>
-                  <span className="block text-[10px] text-slate-400">{isAr ? "الورديات ومؤشرات حضور الموظفين" : "Overview of unit rosters & presence"}</span>
-                </div>
-              </div>
-              <span className="text-[10px] bg-slate-100 font-bold px-2 py-0.5 rounded">PDF</span>
-            </button>
+          {/* Documents export mock */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <h4 className="text-sm font-bold text-slate-800">{isAr ? "سجلات التصدير والاعتمادات" : "Export Archives & Document Approvals"}</h4>
             
-            <button className="border p-4 rounded-xl flex items-center justify-between hover:bg-slate-50 transition duration-155">
-              <div className="flex items-center gap-3">
-                <FileText className="text-red-500 h-5 w-5"/>
-                <div className="text-right">
-                  <span className="block font-bold text-xs text-slate-800">{isAr ? "تقرير الحوادث ومؤشر الجودة" : "Incident Quality Log Report"}</span>
-                  <span className="block text-[10px] text-slate-400">{isAr ? "توثيق أحداث الكود والكسور السريرية" : "Real-time records of response times"}</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <button className="border p-4 rounded-xl flex items-center justify-between hover:bg-slate-50 transition duration-150">
+                <div className="flex items-center gap-3">
+                  <FileText className="text-indigo-500 h-5 w-5"/>
+                  <div className="text-right">
+                    <span className="block font-bold text-xs text-slate-800">{isAr ? "تقرير التمريض اليومي الشامل" : "Comprehensive Daily Nursing Report"}</span>
+                    <span className="block text-[10px] text-slate-400">{isAr ? "الورديات ومؤشرات الحضور ونسب المهام" : "Unit rosters, presence & task compliance"}</span>
+                  </div>
                 </div>
-              </div>
-              <span className="text-[10px] bg-slate-100 font-bold px-2 py-0.5 rounded">PDF</span>
-            </button>
+                <span className="text-[10px] bg-slate-100 font-bold px-2 py-0.5 rounded">PDF</span>
+              </button>
+              
+              <button className="border p-4 rounded-xl flex items-center justify-between hover:bg-slate-50 transition duration-155">
+                <div className="flex items-center gap-3">
+                  <FileText className="text-red-500 h-5 w-5"/>
+                  <div className="text-right">
+                    <span className="block font-bold text-xs text-slate-800">{isAr ? "تقرير الحوادث ومؤشر الجودة الفوري" : "Incident Quality Log & CPR Rhythms"}</span>
+                    <span className="block text-[10px] text-slate-400">{isAr ? "توثيق أحداث الكود الزمني وسرعة الاستجابة" : "Real-time records of response times"}</span>
+                  </div>
+                </div>
+                <span className="text-[10px] bg-slate-100 font-bold px-2 py-0.5 rounded">EXCEL</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

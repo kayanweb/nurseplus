@@ -82,6 +82,7 @@
         "department": { "type": "string" },
         "assignedStaffIds": { "type": "array" },
         "assignedStaffNames": { "type": "array" },
+        "assignedTasks": { "type": "object" },
         "assignedBy": { "type": "string" },
         "updatedAt": { "type": "string" }
       },

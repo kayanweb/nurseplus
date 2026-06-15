@@ -33,9 +33,7 @@
 
   /* Force outer layout structures to expand to full size on the page */
   #main-content-dashboard, 
-  .min-h-screen, 
-  div[class*="grid-cols-"],
-  div[class*="lg:grid-cols-"] {
+  .min-h-screen {
     display: block !important;
     width: 100% !important;
     max-width: 100% !important;

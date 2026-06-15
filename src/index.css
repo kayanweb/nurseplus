@@ -18,7 +18,7 @@
   body {
     background: white !important;
     color: black !important;
-    font-size: 10pt !important;
+    font-size: 9pt !important;
     padding: 0 !important;
     margin: 0 !important;
   }
@@ -31,6 +31,20 @@
     display: block !important;
   }
 
+  /* Force outer layout structures to expand to full size on the page */
+  #main-content-dashboard, 
+  .min-h-screen, 
+  div[class*="grid-cols-"],
+  div[class*="lg:grid-cols-"] {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
   .print-container {
     width: 100% !important;
     max-width: 100% !important;
@@ -39,35 +53,41 @@
     box-shadow: none !important;
     border: none !important;
     background: transparent !important;
+    page-break-after: auto !important;
+    /* Allow it to expand and paginate naturally */
   }
 
   /* Force exact replica borders to be sharp in print */
   table {
     border-collapse: collapse !important;
     width: 100% !important;
+    min-width: 100% !important;
+    table-layout: fixed !important;
   }
 
   th, td {
-    border: 1px solid #000000 !important;
-    padding: 4px 6px !important;
-    font-size: 8pt !important;
+    border: 1.5px solid #000000 !important;
+    padding: 4px 2px !important;
+    font-size: 7.5pt !important;
+    line-height: normal !important;
     color: #000000 !important;
-    background-color: transparent !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
   th {
-    font-weight: 700 !important;
+    font-weight: 800 !important;
     background-color: #f3f4f6 !important;
   }
 
   /* Keep checklist grid columns thin */
   .day-col {
-    width: 2.2% !important;
-    max-width: 2.2% !important;
+    width: 2.3% !important;
+    max-width: 2.3% !important;
     text-align: center !important;
-    padding: 2px 0 !important;
+    padding: 2px 0.5px !important;
+    font-size: 7.5pt !important;
+    font-weight: 700 !important;
   }
 
   /* Prevent page breaks inside form headers */
@@ -80,7 +100,7 @@
     border: none !important;
     background: transparent !important;
     padding: 0 !important;
-    font-size: 9pt !important;
+    font-size: 8.5pt !important;
     color: black !important;
     resize: none !important;
     appearance: none !important;
@@ -89,8 +109,8 @@
 
   /* Custom page setup */
   @page {
-    size: A4 portrait;
-    margin: 1.2cm 1cm 1.2cm 1cm;
+    size: A4 landscape !important;
+    margin: 0.5cm 0.4cm !important;
   }
 }
 

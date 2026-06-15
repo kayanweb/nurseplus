@@ -20,6 +20,7 @@ import {
   Calendar,
   Clock,
   User,
+  Users,
   CheckSquare,
   Thermometer,
   Layers,
@@ -146,7 +147,11 @@ import {
   deleteSentinelIncident,
   getSetting,
   syncSetting,
-  saveSetting
+  saveSetting,
+  syncDailyDuties,
+  saveDailyDuty,
+  syncEmergencyTeams,
+  saveEmergencyTeam
 } from "./lib/firestoreService";
 import { useFirestoreSync, useFirestoreSetting } from "./hooks/useFirestoreSync";
 
@@ -805,6 +810,8 @@ function AppContent() {
     })));
 
   const [dailyChecklists, setDailyChecklists, dailyChecklistsLoaded] = useFirestoreSync<UnitDailyChecklist>(syncDailyAudits, []);
+  const [dailyDuties, setDailyDuties] = useFirestoreSync<any>(syncDailyDuties, []);
+  const [emergencyTeams, setEmergencyTeams] = useFirestoreSync<any>(syncEmergencyTeams, []);
 
   const [rolePermissions, setRolePermissions] = useState(() => {
     const stored = null;
@@ -4644,7 +4651,7 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
   }
 
   return (
-    <div className={`min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans ${language === "ar" ? "rtl" : "ltr"}`} dir={language === "ar" ? "rtl" : "ltr"}>
+    <div className={`min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans ${language === "ar" ? "rtl" : "ltr"} print:block print:min-h-0 print:h-auto print:p-0 print:m-0`} dir={language === "ar" ? "rtl" : "ltr"}>
       
       <aside className="no-print w-full md:w-64 bg-slate-900 text-slate-100 flex flex-col border-b md:border-b-0 md:border-r border-slate-800 shrink-0 md:sticky md:top-0 md:h-screen md:overflow-y-auto">
         <div className="p-5 border-b border-slate-800">
@@ -4714,6 +4721,22 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
             <ClipboardCheck className={`h-4 w-4 shrink-0 ${activeTab === "nursing_toolbox" ? "text-indigo-400" : "text-slate-500"}`} />
             <span className="flex-1">{language === "ar" ? "أدوات التمريض الإدارية" : "Nursing Admin Tools"}</span>
           </button>
+
+          {/* 1.2 Supervisor & Admin Dashboard */}
+          {isSupervisor && (
+            <button
+              onClick={() => setActiveTab("supervisor")}
+              className={`w-full flex items-center gap-3 px-6 py-4 text-right text-xs font-semibold transition-all border-l-4 ${
+                activeTab === "supervisor"
+                  ? "bg-slate-800 border-indigo-500 text-indigo-400 font-bold shadow-md shadow-indigo-900/20"
+                  : "border-transparent text-slate-400 hover:bg-slate-850 hover:text-white hover:border-indigo-500"
+              }`}
+            >
+              <ShieldCheck className={`h-4 w-4 shrink-0 ${activeTab === "supervisor" ? "text-indigo-400" : "text-slate-500"}`} />
+              <span className="flex-1">{language === "ar" ? "لوحة تحكم المشرف والسوبر فايزر" : "Supervisor Dashboard"}</span>
+              <span className="bg-emerald-500 text-white text-[8px] px-1.5 py-0.5 rounded-full font-bold">SUPER</span>
+            </button>
+          )}
           
           {/* 1.3 Medication Intelligence Ledger */}
           <button
@@ -4980,7 +5003,7 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 print:block print:min-w-full print:w-full print:p-0 print:m-0">
         
         {/* Top Header Bar - Hides completely on Print */}
         <header className="no-print bg-gradient-to-r from-white via-slate-50 to-pink-50/25 border-b border-slate-200 flex flex-col md:flex-row items-center justify-between px-8 py-4.5 gap-4 shadow-sm z-10 text-right">
@@ -5195,7 +5218,7 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
         )}
 
         {/* Content Dashboard */}
-        <main className="p-4 sm:p-6 flex-1 flex flex-col gap-6 overflow-y-auto custom-main-scroll" id="main-content-dashboard">
+        <main className="p-4 sm:p-6 flex-1 flex flex-col gap-6 overflow-y-auto print:overflow-visible print:h-auto print:p-0 print:m-0 custom-main-scroll" id="main-content-dashboard">
           
           {/* Quick Informative Statistics summary cards */}
           <div className="no-print grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -5235,7 +5258,16 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
 
           {/* TAB 0: Daily Unit Duty & Checklist Portal - Designed for Unit Entrance, Crew Checklists & Nursing Supervisor Signoffs */}
           {activeTab === "supervisor" && (
-            <SupervisorDashboard language={language} />
+            <SupervisorDashboard 
+              language={language}
+              currentUser={currentUser}
+              systemUsers={systemUsers}
+              departments={departments}
+              dailyDuties={dailyDuties}
+              saveDailyDuty={saveDailyDuty}
+              emergencyTeams={emergencyTeams}
+              saveEmergencyTeam={saveEmergencyTeam}
+            />
           )}
           {activeTab === "medication_ledger" && (
             <MedicationLedger language={language} />
@@ -5658,6 +5690,86 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                         </div>
                       </div>
 
+                      {/* GORGEOUS REAL-TIME TEAM ASSIGNMENT BANNER */}
+                      {(() => {
+                        const todayDutyAssignment = dailyDuties.find(
+                          (d) => d.date === todayString && d.department === effectiveDutyDept
+                        );
+                        const todayEmergencyTeam = emergencyTeams.find(
+                          (t) => d => false || t.date === todayString
+                        );
+
+                        const hasDuties = todayDutyAssignment && todayDutyAssignment.assignedStaffIds?.length > 0;
+                        // Since there might be some typo in t => d => false, let's write simple find condition
+                        const realEmergencyTeam = emergencyTeams.find(t => t.date === todayString);
+                        const hasEmergency = realEmergencyTeam && Object.keys(realEmergencyTeam.roles || {}).length > 0;
+
+                        if (!hasDuties && !hasEmergency) return null;
+
+                        return (
+                          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3 text-right" dir={language === "ar" ? "rtl" : "ltr"}>
+                            <div className="flex items-center gap-1.5 border-b border-slate-200 pb-2">
+                              <Users className="h-4 w-4 text-pink-600" />
+                              <span className="text-xs font-black text-slate-900">
+                                {language === "ar" ? "طاقم العمل وفرق التدخل الطارئ لليوم:" : "Today's Assigned Handover & Response Team:"}
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {/* Left box: Department Duty Staff */}
+                              {hasDuties && (
+                                <div className="space-y-1.5">
+                                  <span className="text-[10px] font-black text-slate-500 block">
+                                    📋 {language === "ar" ? `المكلّفون بالديوتي اليومي بالقسم (${effectiveDutyDept}):` : `Assigned Ward Duty Staff (${effectiveDutyDept}):`}
+                                  </span>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {todayDutyAssignment.assignedStaffIds.map((id: string) => {
+                                      const u = systemUsers.find(usr => usr.id === id);
+                                      if (!u) return null;
+                                      return (
+                                        <span key={id} className="inline-flex items-center gap-1 bg-white border border-slate-200 text-slate-800 text-[10px] font-bold px-2 py-1 rounded-lg shadow-sm">
+                                          <span className="w-1.5 h-1.5 rounded-full bg-indigo-505 bg-indigo-500"></span>
+                                          {language === "ar" ? u.nameAr : u.nameEn} (ID: {u.staffId})
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Right box: Emergency Code Blue Handover */}
+                              {hasEmergency && realEmergencyTeam.roles && (
+                                <div className="space-y-1.5 border-t md:border-t-0 md:border-r border-slate-200 md:pr-4">
+                                  <span className="text-[10px] font-black text-red-600 block">
+                                    🚨 {language === "ar" ? "مسؤوليات الطوارئ والإنعاش القلبي النشطة:" : "Active Code Blue & Emergency Responders:"}
+                                  </span>
+                                  <div className="space-y-1">
+                                    {realEmergencyTeam.roles.codeBlueLeader && (
+                                      <div className="text-[10px] text-slate-700 font-bold">
+                                        • <span className="text-rose-600">{language === "ar" ? "قائد الكود بلو:" : "Code Blue Leader:"}</span>{" "}
+                                        {language === "ar" ? realEmergencyTeam.roles.codeBlueLeader.nameAr : realEmergencyTeam.roles.codeBlueLeader.nameEn}
+                                      </div>
+                                    )}
+                                    {realEmergencyTeam.roles.defibOperator && (
+                                      <div className="text-[10px] text-slate-700 font-bold">
+                                        • <span className="text-rose-600">{language === "ar" ? "جهاز الصدمات:" : "Defib CPR Runner:"}</span>{" "}
+                                        {language === "ar" ? realEmergencyTeam.roles.defibOperator.nameAr : realEmergencyTeam.roles.defibOperator.nameEn}
+                                      </div>
+                                    )}
+                                    {realEmergencyTeam.roles.airwayManager && (
+                                      <div className="text-[10px] text-slate-700 font-bold">
+                                        • <span className="text-rose-600">{language === "ar" ? "مجاري الهواء:" : "Airway Specialist:"}</span>{" "}
+                                        {language === "ar" ? realEmergencyTeam.roles.airwayManager.nameAr : realEmergencyTeam.roles.airwayManager.nameEn}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
+
                       {/* Check if already submitted/audited today */}
                       {todaysChecklist && (
                         <div className={`p-4 rounded-xl border flex flex-col sm:flex-row justify-between items-center gap-4 text-xs ${
@@ -6059,6 +6171,22 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
 
             return (
               <div className="space-y-4">
+                {/* DYNAMIC LANDSCAPE AND ZOOM SETTINGS FOR CHECKLIST PRINT ACTION */}
+                <style>{`
+                  @media print {
+                    @page {
+                      size: A4 landscape !important;
+                      margin: 0 !important; /* Zero margin for absolute edge alignment */
+                    }
+                    html, body {
+                      width: 100% !important;
+                      height: 100% !important;
+                      margin: 0 !important;
+                      padding: 0.3cm 0.4cm !important;
+                      zoom: 61% !important; /* Ideal zoom to fit 31-day logs cleanly on A4 Landscape Page */
+                    }
+                  }
+                `}</style>
                 {activeDirectives.length > 0 && (
                   <div className="no-print bg-gradient-to-l from-rose-500 via-rose-600 to-pink-600 text-white rounded-xl p-4 shadow-md border border-rose-400/40 relative overflow-hidden">
                     <div className="absolute top-0 bottom-0 left-0 w-1/4 bg-radial-gradient from-white/10 to-transparent pointer-events-none" />
@@ -6091,7 +6219,7 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 print:block print:w-full print:max-w-full">
               
               {/* Sidebar templates selector with custom search box */}
               <aside className="no-print lg:col-span-1 bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-4">
@@ -6256,7 +6384,7 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
               </aside>
 
               {editingRecord ? (
-                <div className="lg:col-span-3 space-y-6">
+                <div className="lg:col-span-3 space-y-6 print:block print:w-full print:max-w-full print:p-0 print:m-0">
                   {/* Action Toolbar */}
                   <div className="no-print flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
                     <div className="flex items-center gap-2">
@@ -6267,6 +6395,33 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                         <X className="h-4 w-4" />
                         {language === "ar" ? "إغلاق" : "Close Editor"}
                       </button>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-3 flex-1 px-4 border-l border-r border-slate-100 min-w-[200px]">
+                      <label className="text-[10px] font-bold text-slate-500 whitespace-nowrap">
+                        {language === "ar" ? "نطاق الطباعة والتقييم:" : "Print & View Range:"}
+                      </label>
+                      <select 
+                        value={dayFocus.toString()} 
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          // Allow any string to act as range (e.g. '1-15', 'all') or number
+                          setDayFocus(val as any);
+                        }}
+                        className="bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold px-2 py-1 outline-none text-slate-700 w-full max-w-[160px] cursor-pointer"
+                      >
+                        <option value="all">{language === "ar" ? "كامل استمارة الشهر" : "Full Month Table"}</option>
+                        <option value="1-10">{language === "ar" ? "الفترة الأولى (1-10)" : "1st Period (1-10)"}</option>
+                        <option value="11-20">{language === "ar" ? "الفترة الثانية (11-20)" : "2nd Period (11-20)"}</option>
+                        <option value="21-31">{language === "ar" ? "الفترة الثالثة (21-31)" : "3rd Period (21-31)"}</option>
+                        <option value="1-15">{language === "ar" ? "منتصف أول (1-15)" : "1st Half (1-15)"}</option>
+                        <option value="16-31">{language === "ar" ? "منتصف ثاني (16-31)" : "2nd Half (16-31)"}</option>
+                        <optgroup label={language === "ar" ? "يوم مخصص للتدقيق" : "Specific Day Audit"}>
+                          {Array.from({ length: 31 }, (_, i) => (
+                            <option key={i+1} value={i+1}>{language === "ar" ? `يوم ${i+1}` : `Day ${i+1}`}</option>
+                          ))}
+                        </optgroup>
+                      </select>
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -6450,7 +6605,7 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                   <div className="print-container bg-white p-6 sm:p-8 rounded-b-xl border border-slate-200 shadow-sm relative overflow-visible print:border-none print:shadow-none print:p-0">
                     
                     {/* Double bordered box representing high standard Egyptian Clinical documents */}
-                    <div className="border-[3px] border-slate-900 p-5 rounded-lg relative overflow-hidden print:p-0 print:border-none">
+                    <div className="border-[3px] border-slate-900 p-5 rounded-lg relative overflow-hidden print:overflow-visible print:p-0 print:border-none">
                       
                       {/* RED INK QUALITY OFFICERS CERTIFICATION SEAL (ختم في الجانب مع روتيت) */}
                       {editingRecord.additionalInfo?.isQualityCertified && (
@@ -6802,7 +6957,7 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                           </div>
 
                           {/* Interactive Data Table */}
-                          <div className="overflow-x-auto border rounded-lg border-slate-200 print:border-none animate-fade">
+                          <div className="overflow-x-auto border rounded-lg border-slate-200 print:overflow-visible print:border-none animate-fade">
                             <table className="min-w-full text-right divide-y divide-slate-250 border-collapse print:text-black">
                               <thead className="bg-slate-100 border-b-2 border-slate-900">
                                 <tr className="divide-x divide-x-reverse divide-slate-200">
@@ -6815,8 +6970,18 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                                   <th scope="col" className="px-2 py-3 text-center text-xs font-black text-slate-850 w-12 mr-1">Qty</th>
                                   
                                   {/* Day headers with Bulk Action Checkboxes */}
-                                  {dayFocus === "all" ? (
-                                    Array.from({ length: numDays }, (_, i) => (i + 1).toString()).map(day => (
+                                  {(() => {
+                                    let daysArray: string[] = [];
+                                    if (dayFocus === "all") {
+                                      daysArray = Array.from({ length: numDays }, (_, i) => (i + 1).toString());
+                                    } else if (typeof dayFocus === "string" && dayFocus.includes("-")) {
+                                      const [start, end] = dayFocus.split("-").map(Number);
+                                      for (let i = start; i <= Math.min(end, numDays); i++) daysArray.push(i.toString());
+                                    } else {
+                                      daysArray = [dayFocus.toString()];
+                                    }
+                                    
+                                    return daysArray.map(day => (
                                       <th 
                                         key={day} 
                                         scope="col" 
@@ -6829,12 +6994,8 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                                           Fill
                                         </div>
                                       </th>
-                                    ))
-                                  ) : (
-                                    <th scope="col" className="px-3 py-2 text-center text-xs font-bold text-pink-700 w-24">
-                                      {language === "ar" ? `يوم الفحص ${dayFocus}` : `Day ${dayFocus}`}
-                                    </th>
-                                  )}
+                                    ));
+                                  })()}
                                 </tr>
                               </thead>
                               
@@ -6875,8 +7036,18 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                                     </td>
 
                                     {/* Columns for checkmarks days */}
-                                    {dayFocus === "all" ? (
-                                      Array.from({ length: numDays }, (_, i) => (i + 1).toString()).map(day => {
+                                    {(() => {
+                                      let daysArray: string[] = [];
+                                      if (dayFocus === "all") {
+                                        daysArray = Array.from({ length: numDays }, (_, i) => (i + 1).toString());
+                                      } else if (typeof dayFocus === "string" && dayFocus.includes("-")) {
+                                        const [start, end] = dayFocus.split("-").map(Number);
+                                        for (let i = start; i <= Math.min(end, numDays); i++) daysArray.push(i.toString());
+                                      } else {
+                                        daysArray = [dayFocus.toString()];
+                                      }
+
+                                      return daysArray.map(day => {
                                         const val = row.days[day] || "";
                                         return (
                                           <td
@@ -6892,31 +7063,15 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                                                 : "lg:hover:bg-slate-100"
                                             }`}
                                           >
-                                            {val}
+                                            {val || (daysArray.length === 1 && (
+                                              <span className="text-[10px] text-slate-350 font-normal">
+                                                {language === "ar" ? "اضغط" : "Click"}
+                                              </span>
+                                            ))}
                                           </td>
                                         );
-                                      })
-                                    ) : (
-                                      // Single focused Day Column mode
-                                      <td
-                                        onClick={() => handleCellToggle(rIndex, dayFocus.toString())}
-                                        className={`px-3 py-2 text-center text-xs font-bold cursor-pointer transition select-none ${
-                                          row.days[dayFocus.toString()] === "✔" 
-                                            ? "bg-emerald-50 text-emerald-800" 
-                                            : row.days[dayFocus.toString()] === "✘" 
-                                            ? "bg-red-50 text-red-800 font-black" 
-                                            : row.days[dayFocus.toString()] !== "" 
-                                            ? "bg-blue-50 text-blue-900 font-mono text-[10px]" 
-                                            : "lg:hover:bg-slate-100"
-                                        }`}
-                                      >
-                                        {row.days[dayFocus.toString()] || (
-                                          <span className="text-[10px] text-slate-350 font-normal">
-                                            {language === "ar" ? "اضغط" : "Click"}
-                                          </span>
-                                        )}
-                                      </td>
-                                    )}
+                                      });
+                                    })()}
                                   </tr>
                                 ))}
                               </tbody>
@@ -6933,34 +7088,34 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                                   <td className="px-2 py-2 text-center text-[10px] font-black text-slate-600 bg-slate-100">-</td>
                                   <td className="px-2 py-2 text-center text-[10px] font-black text-slate-600 bg-slate-100">-</td>
                                   
-                                  {dayFocus === "all" ? (
-                                    Array.from({ length: ledgerViewMode === "weekly" ? 7 : numDays }, (_, i) => (i + 1).toString()).map(day => {
-                                      const isDayFilled = editingRecord.gridData.some(row => row.days[day] !== undefined && row.days[day] !== "");
-                                      return (
-                                        <td key={day} className="day-col px-0.5 py-1.5 text-center text-[9px] font-sans font-black bg-slate-50">
-                                          {isDayFilled ? (
-                                            <div className="flex flex-col items-center justify-center">
-                                              <span className="text-[8px] bg-pink-100 text-pink-850 border border-pink-200/50 py-0.5 px-0.5 rounded leading-none block font-sans scale-[0.9] select-none" title={`Signed by: ${editingRecord.staffName || 'Staff Nurse'}`}>
-                                                ✍ {editingRecord.staffName ? editingRecord.staffName.split(" ")[0] : (language === "ar" ? "تمريض" : "Nurse")}
-                                              </span>
-                                            </div>
-                                          ) : (
-                                            <span className="text-slate-300">-</span>
-                                          )}
-                                        </td>
-                                      );
-                                    })
-                                  ) : (
-                                    <td className="px-3 py-2 text-center text-xs font-bold bg-slate-50 font-sans">
-                                      {editingRecord.gridData.some(row => row.days[dayFocus.toString()] !== undefined && row.days[dayFocus.toString()] !== "") ? (
-                                        <span className="text-[10px] bg-pink-100 text-pink-805 border border-pink-200 py-1 px-2 rounded-full inline-block font-sans font-black">
-                                          ✍ {editingRecord.staffName || (language === "ar" ? "توقيع التمريض المعتمد" : "Nurse Signoff")}
-                                        </span>
-                                      ) : (
-                                        <span className="text-slate-300">-</span>
-                                      )}
-                                    </td>
-                                  )}
+                                  {(() => {
+                                      let daysArray: string[] = [];
+                                      if (dayFocus === "all") {
+                                        daysArray = Array.from({ length: ledgerViewMode === "weekly" ? 7 : numDays }, (_, i) => (i + 1).toString());
+                                      } else if (typeof dayFocus === "string" && dayFocus.includes("-")) {
+                                        const [start, end] = dayFocus.split("-").map(Number);
+                                        for (let i = start; i <= Math.min(end, numDays); i++) daysArray.push(i.toString());
+                                      } else {
+                                        daysArray = [dayFocus.toString()];
+                                      }
+
+                                      return daysArray.map(day => {
+                                        const isDayFilled = editingRecord.gridData.some(row => row.days[day] !== undefined && row.days[day] !== "");
+                                        return (
+                                          <td key={day} className="day-col px-0.5 py-1.5 text-center text-[9px] font-sans font-black bg-slate-50">
+                                            {isDayFilled ? (
+                                              <div className="flex flex-col items-center justify-center">
+                                                <span className="text-[8px] bg-pink-100 text-pink-850 border border-pink-200/50 py-0.5 px-0.5 rounded leading-none block font-sans scale-[0.9] select-none" title={`Signed by: ${editingRecord.staffName || 'Staff Nurse'}`}>
+                                                  ✍ {editingRecord.staffName ? editingRecord.staffName.split(" ")[0] : (language === "ar" ? "تمريض" : "Nurse")}
+                                                </span>
+                                              </div>
+                                            ) : (
+                                              <span className="text-slate-300">-</span>
+                                            )}
+                                          </td>
+                                        );
+                                      });
+                                  })()}
                                 </tr>
                               </tfoot>
                             </table>
@@ -9170,7 +9325,7 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                 )}
 
                 {/* Major Display: Dynamic Grid Table Roster */}
-                <div className="bg-white border border-slate-210 rounded-2xl shadow-md overflow-hidden print-container roster-card-box">
+                <div className="bg-white border border-slate-210 rounded-2xl shadow-md overflow-hidden print:overflow-visible print-container roster-card-box">
                   <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2">
                     <h4 className="font-black text-sm text-slate-800 flex items-center gap-1.5">
                       <TrendingUp className="h-4 w-4 text-pink-600" />
@@ -9195,8 +9350,8 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                   </div>
 
                   {/* Grid Wrapper with Horizontal scrolling */}
-                  <div className="overflow-x-auto print:overflow-visible max-w-full roster-print-wrapper print-container">
-                    <table className="w-full text-right border-collapse table-auto text-xs min-w-[1400px]">
+                  <div className="overflow-x-auto print:overflow-visible max-w-full roster-print-wrapper print:w-full print:m-0">
+                    <table className="w-full text-right border-collapse table-auto text-xs min-w-[1400px] print:min-w-0 print:w-full">
                       <thead>
                         <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 select-none">
                           <th className="sticky right-0 bg-slate-100 z-10 p-2.5 text-center border-l border-slate-200 min-w-[200px]">

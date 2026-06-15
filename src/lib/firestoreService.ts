@@ -960,6 +960,78 @@ export async function deleteAdminRequest(id: string): Promise<void> {
   }
 }
 
+// 22. Daily Duties Assignment (Real-time)
+export function syncDailyDuties(onData: (data: any[]) => void) {
+  const path = "baheya_daily_duties";
+  return onSnapshot(
+    collection(db, path),
+    (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((doc) => {
+        list.push(doc.data());
+      });
+      onData(list);
+    },
+    (error) => {
+      handleFirestoreError(error, OperationType.LIST, path);
+    }
+  );
+}
+
+export async function saveDailyDuty(duty: any): Promise<void> {
+  const path = `baheya_daily_duties/${duty.id}`;
+  try {
+    await setDoc(doc(db, "baheya_daily_duties", duty.id), duty);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export async function deleteDailyDuty(id: string): Promise<void> {
+  const path = `baheya_daily_duties/${id}`;
+  try {
+    await deleteDoc(doc(db, "baheya_daily_duties", id));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
+// 23. Daily Emergency Teams Selection (Real-time)
+export function syncEmergencyTeams(onData: (data: any[]) => void) {
+  const path = "baheya_daily_emergency_teams";
+  return onSnapshot(
+    collection(db, path),
+    (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((doc) => {
+        list.push(doc.data());
+      });
+      onData(list);
+    },
+    (error) => {
+      handleFirestoreError(error, OperationType.LIST, path);
+    }
+  );
+}
+
+export async function saveEmergencyTeam(team: any): Promise<void> {
+  const path = `baheya_daily_emergency_teams/${team.id}`;
+  try {
+    await setDoc(doc(db, "baheya_daily_emergency_teams", team.id), team);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export async function deleteEmergencyTeam(id: string): Promise<void> {
+  const path = `baheya_daily_emergency_teams/${id}`;
+  try {
+    await deleteDoc(doc(db, "baheya_daily_emergency_teams", id));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
 
 
 

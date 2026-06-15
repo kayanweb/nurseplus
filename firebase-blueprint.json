@@ -71,9 +71,45 @@
         "type": { "type": "string" }
       },
       "required": ["senderId", "content", "type"]
+    },
+    "DailyDutyAssignment": {
+      "title": "DailyDutyAssignment",
+      "description": "Staff assigned to the daily duty of a specific department",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string" },
+        "department": { "type": "string" },
+        "assignedStaffIds": { "type": "array" },
+        "assignedStaffNames": { "type": "array" },
+        "assignedBy": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "date", "department", "assignedStaffIds"]
+    },
+    "EmergencyTeamAssignment": {
+      "title": "EmergencyTeamAssignment",
+      "description": "Daily supervisor assignments for Code Blue and other emergency teams",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string" },
+        "roles": { "type": "object" },
+        "assignedBy": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "date", "roles"]
     }
   },
   "firestore": {
+    "baheya_daily_duties": {
+      "schema": "DailyDutyAssignment",
+      "description": "Stores daily staff assignments for department duties"
+    },
+    "baheya_daily_emergency_teams": {
+      "schema": "EmergencyTeamAssignment",
+      "description": "Stores daily emergency team staffings like Code Blue, Code Red"
+    },
     "baheya_clinical_records": {
       "schema": "SavedRecord",
       "description": "Stores clinical and safety log records"

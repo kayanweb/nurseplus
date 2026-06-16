@@ -1,5 +1,8 @@
 import React, { useState } from "react";
 import { Settings, ShieldAlert, Banknote, Users, Server, Lock, DownloadCloud, LineChart, BarChart } from "lucide-react";
+import { useFirestoreSync } from "../hooks/useFirestoreSync";
+import { syncSystemUsers, syncRoles, syncAccessMatrix, syncAuditLogs } from "../lib/firestoreService";
+import type { AppUser, Role, AccessMatrix, AuditLog } from "../types"; // if available, or just fallback to any
 
 interface Props {
   language: "ar" | "en";
@@ -8,6 +11,27 @@ interface Props {
 export default function SystemAdminPanel({ language }: Props) {
   const isAr = language === "ar";
   const [activeTab, setActiveTab] = useState<"config" | "tariff" | "rbac" | "logs" | "bi">("bi");
+  
+  // Real-time data syncs for Identities and Commands (Audit)
+  const [roles, setRoles] = useFirestoreSync<any>(syncRoles, []);
+  const [users, setUsers] = useFirestoreSync<any>(syncSystemUsers, []);
+  const [accessMatrix, setAccessMatrix] = useFirestoreSync<any>(syncAccessMatrix, []);
+  const [auditLogs, setAuditLogs] = useFirestoreSync<any>(syncAuditLogs, []);
+
+  const defaultRoles = [
+    { id: "r1", name: "Doctor (OPD)" },
+    { id: "r2", name: "Nurse (Ward)" },
+    { id: "r3", name: "Cashier / Billing" },
+    { id: "r4", name: "System Admin" }
+  ];
+  const displayRoles = roles.length > 0 ? roles : defaultRoles;
+
+  const defaultAuditLogs = [
+    { id: "l1", time: "2026-06-16 08:05:12", type: "INFO", user: "dr_ahmed", screen: "EMR_Prescription", action: "CREATE", target: "MRN-2026-0041" },
+    { id: "l2", time: "2026-06-16 08:30:45", type: "WARN", user: "cashier_01", screen: "Ledger_Adjust", action: "DISCOUNT_APPLY", target: "INV-6021" },
+    { id: "l3", time: "2026-06-16 09:12:00", type: "DENY", user: "nurse_ola", screen: "Billing_Ledger", action: "VIEW", target: "RBAC Violation" }
+  ];
+  const displayLogs = auditLogs.length > 0 ? auditLogs : defaultAuditLogs;
 
   return (
     <div className="p-4 md:p-6 bg-slate-50 min-h-screen font-sans text-right" dir={isAr ? "rtl" : "ltr"}>
@@ -183,13 +207,17 @@ export default function SystemAdminPanel({ language }: Props) {
 
          {activeTab === "rbac" && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-in">
-               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 col-span-1">
-                  <h3 className="font-black text-slate-800 mb-4">{isAr ? "الأدوار الثابتة (Roles)" : "Defined Roles"}</h3>
+               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 col-span-1 h-[400px] overflow-y-auto">
+                  <h3 className="font-black text-slate-800 mb-4 flex justify-between items-center">
+                    <span>{isAr ? "الأدوار الثابتة (Roles)" : "Defined Roles"}</span>
+                    <span className="bg-fuchsia-100 text-fuchsia-700 px-2 py-0.5 rounded-full text-[10px]">{displayRoles.length} Roles</span>
+                  </h3>
                   <div className="space-y-2">
-                     <button className="w-full text-left bg-fuchsia-50 border border-fuchsia-200 text-fuchsia-800 font-bold p-3 rounded-xl text-sm">Doctor (OPD)</button>
-                     <button className="w-full text-left bg-white border border-slate-200 text-slate-600 font-bold p-3 rounded-xl text-sm hover:border-slate-300">Nurse (Ward)</button>
-                     <button className="w-full text-left bg-white border border-slate-200 text-slate-600 font-bold p-3 rounded-xl text-sm hover:border-slate-300">Cashier / Billing</button>
-                     <button className="w-full text-left bg-white border border-slate-200 text-slate-600 font-bold p-3 rounded-xl text-sm hover:border-slate-300">System Admin</button>
+                     {displayRoles.map((role: any, idx: number) => (
+                       <button key={role.id || idx} className={`w-full text-left font-bold p-3 rounded-xl text-sm border transition-all ${idx === 0 ? "bg-fuchsia-50 border-fuchsia-200 text-fuchsia-800" : "bg-white border-slate-200 text-slate-600 hover:border-slate-300"}`}>
+                         {role.name}
+                       </button>
+                     ))}
                   </div>
                </div>
                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 col-span-2">
@@ -242,11 +270,14 @@ export default function SystemAdminPanel({ language }: Props) {
                       <DownloadCloud className="w-4 h-4"/> CSV Export
                    </button>
                </div>
-               <div className="font-mono text-xs space-y-2 bg-black p-4 rounded-xl h-[400px] overflow-y-auto border border-slate-800">
-                  <p className="border-b border-slate-800 pb-2"><span className="text-emerald-400">[2026-06-16 08:05:12]</span> <span className="text-blue-400">INFO</span> | User: <b>dr_ahmed</b> | Screen: EMR_Prescription | Action: CREATE | Target: MRN-2026-0041 | IP: 192.168.1.45</p>
-                  <p className="border-b border-slate-800 pb-2"><span className="text-emerald-400">[2026-06-16 08:30:45]</span> <span className="text-yellow-400">WARN</span> | User: <b>cashier_01</b> | Screen: Ledger_Adjust | Action: DISCOUNT_APPLY (-10%) | Target: INV-6021 | Auth: cno_override</p>
-                  <p className="border-b border-slate-800 pb-2"><span className="text-emerald-400">[2026-06-16 09:12:00]</span> <span className="text-red-400">DENY</span> | User: <b>nurse_ola</b> | Screen: Billing_Ledger | Action: VIEW | Reason: RBAC Violation "Deny Read"</p>
-                  <p className="border-b border-slate-800 pb-2"><span className="text-emerald-400">[2026-06-16 09:15:22]</span> <span className="text-blue-400">INFO</span> | System: <b>LIS_Engine</b> | Screen: AutoVerify | Action: SIGN_OFF | Target: SMP.2606.10A | Result: Normal Range</p>
+               <div className="font-mono text-[11px] space-y-2 bg-black p-4 rounded-xl h-[400px] overflow-y-auto border border-slate-800">
+                  {displayLogs.map((log: any, idx: number) => (
+                    <p key={log.id || idx} className="border-b border-slate-800 pb-2">
+                      <span className="text-emerald-400">[{log.time}]</span>{" "}
+                      <span className={log.type === "INFO" ? "text-blue-400" : log.type === "WARN" ? "text-yellow-400" : "text-red-400"}>{log.type}</span>{" "}
+                      | User: <b className="text-white">{log.user || log.userId}</b> | Screen: {log.screen} | Action: {log.action} | Target: {log.target}
+                    </p>
+                  ))}
                </div>
             </div>
          )}

@@ -122,7 +122,7 @@ export default function SupervisorRoundingAudit({ language, isAr }: RoundingAudi
 
   const printRef = useRef<HTMLDivElement>(null);
   const handlePrint = useReactToPrint({
-    content: () => printRef.current,
+    contentRef: printRef,
     documentTitle: `Rounding_Report_${currentRound?.department}_${currentRound?.date}`,
   });
 

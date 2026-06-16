@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { User, ClipboardList, Database, Clock, CalendarCheck, ShieldCheck, CheckSquare, PlusCircle, Activity, BedDouble, ArrowRightLeft, FileWarning, Search } from "lucide-react";
+import { User, ClipboardList, Database, Clock, CalendarCheck, ShieldCheck, CheckSquare, PlusCircle, Activity, BedDouble, ArrowRightLeft, FileWarning, Search, ShieldAlert } from "lucide-react";
 import SmartNotificationCenter from "./SmartNotificationCenter";
 
 interface Props {

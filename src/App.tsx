@@ -51,7 +51,13 @@ import {
   Mail,
   Key,
   Save,
-  Coffee
+  Coffee,
+  Stethoscope,
+  BedDouble,
+  Scissors,
+  Pill,
+  Receipt,
+  Microscope,
 } from "lucide-react";
 import { 
   GoogleAuthProvider, 
@@ -97,6 +103,15 @@ import NursingDirectorDashboard from "./components/NursingDirectorDashboard";
 import NursingSupervisorDashboard from "./components/NursingSupervisorDashboard";
 import HeadNurseDashboard from "./components/HeadNurseDashboard";
 import PatientTransportLog from "./components/PatientTransportLog";
+import PatientRegistration from "./components/PatientRegistration";
+import EMRDashboard from "./components/EMRDashboard";
+import PharmacyInventory from "./components/PharmacyInventory";
+import BillingInsurance from "./components/BillingInsurance";
+import LISRISDashboard from "./components/LISRISDashboard";
+import WardNurseDashboard from "./components/WardNurseDashboard";
+import OperatingTheaterBoard from "./components/OperatingTheaterBoard";
+import SystemAdminPanel from "./components/SystemAdminPanel";
+import HospitalInformationSystem from "./components/HospitalInformationSystem";
 import { FORM_TEMPLATES, createNewRecord, getItemsForTemplate } from "./data/templates";
 import { generatePDF } from "./lib/pdfGenerator";
 import {
@@ -762,7 +777,7 @@ function AppContent() {
   const [userRegistrySearch, setUserRegistrySearch] = useState("");
   const [userRegistryPage, setUserRegistryPage] = useState(0);
   const [dbStatus, setDbStatus] = useState<"connected" | "syncing" | "error">("connected");
-  const [activeTab, setActiveTab] = useState<"editor" | "history" | "settings" | "login_settings" | "about" | "analytics" | "duty" | "it_panel" | "distribution" | "roster" | "messaging" | "cloud_settings" | "roster_config" | "approval" | "profile" | "medical_tools" | "nursing_toolbox" | "supervisor" | "medication_ledger" | "meals" | "director_dashboard" | "supervisor_dashboard" | "headnurse_dashboard" | "transport">("duty");
+  const [activeTab, setActiveTab] = useState<"editor" | "history" | "settings" | "login_settings" | "about" | "analytics" | "duty" | "it_panel" | "distribution" | "roster" | "messaging" | "cloud_settings" | "roster_config" | "approval" | "profile" | "medical_tools" | "nursing_toolbox" | "supervisor" | "medication_ledger" | "meals" | "director_dashboard" | "supervisor_dashboard" | "headnurse_dashboard" | "transport" | "reception" | "emr" | "pharmacy" | "billing" | "ancillary" | "ward" | "ot" | "hospital_admin">("duty");
   const [ledgerViewMode, setLedgerViewMode] = useState<"weekly" | "monthly">("weekly");
   const [dayFocus, setDayFocus] = useState<"all" | number>("all"); // Show all 31 days or focus on a single day
   const [language, setLanguage] = useState<"ar" | "en">("ar");
@@ -1748,15 +1763,19 @@ Full administrative override and emergency clinical execution privileges have be
 
   // Dynamic Departments
   const [departments, setDepartments] = useState<string[]>(() => {
-    const stored = null;
-    if (stored) {
-      try {
+    try {
+      const stored = localStorage.getItem("baheya_hospital_departments");
+      if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed.includes("OPERATING ROOM") || parsed.includes("PEDIATRIC WARD")) {
-          return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const valid = parsed
+            .filter(d => typeof d === "string" && d.trim().length > 0)
+            .map(d => d.trim());
+          return Array.from(new Set(valid)) as string[];
         }
-      } catch (e) {}
-    }
+      }
+    } catch (e) {}
+    
     const defaultDepts = [
       "EMERGENCY UNIT",
       "INTENSIVE CARE",
@@ -1776,7 +1795,7 @@ Full administrative override and emergency clinical execution privileges have be
       "ONCOLOGY RESEARCH"
     ];
     saveSetting("baheya_hospital_departments", defaultDepts);
-    return defaultDepts;
+    return Array.from(new Set(defaultDepts));
   });
 
   // Unique Partitioning Filter: Year and Department
@@ -4848,48 +4867,23 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
             </button>
           )}
 
-          {/* Role-Specific Master Dashboards */}
-          {(currentUser.role === "admin" || currentUser.role === "cno" || currentUser.role === "president" || currentUser.role === "quality") && (
-            <button
-              onClick={() => setActiveTab("director_dashboard")}
-              className={`w-full flex items-center gap-3 px-6 py-3 text-right text-xs font-semibold transition-all border-l-4 ${
-                activeTab === "director_dashboard"
-                  ? "bg-slate-800 border-indigo-500 text-indigo-400 font-bold shadow-md"
-                  : "border-transparent text-slate-400 hover:bg-slate-850 hover:text-white hover:border-indigo-900"
-              }`}
-            >
-              <TrendingUp className={`h-4 w-4 shrink-0 ${activeTab === "director_dashboard" ? "text-indigo-400" : "text-slate-500"}`} />
-              <span className="flex-1">{language === "ar" ? "شاشة الإدارة العليا CNO" : "Director & CNO Dashboard"}</span>
-            </button>
-          )}
+          {/* New HIS Complete System Sections */}
+          <div className="mt-8 mb-2 px-6">
+             <div className="flex items-center gap-2 text-slate-500 opacity-60">
+                <div className="h-px bg-slate-700 flex-1"></div>
+                <LayoutGrid className="w-4 h-4" />
+                <div className="h-px bg-slate-700 flex-1"></div>
+             </div>
+             <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mt-2.5 text-center">
+                {language === "ar" ? "نظام إدارة المستشفى الذكي" : "Smart HIS System"}
+             </p>
+          </div>
 
-          {(currentUser.role === "admin" || currentUser.role === "supervisor" || currentUser.role === "quality") && (
-            <button
-              onClick={() => setActiveTab("supervisor_dashboard")}
-              className={`w-full flex items-center gap-3 px-6 py-3 text-right text-xs font-semibold transition-all border-l-4 ${
-                activeTab === "supervisor_dashboard"
-                  ? "bg-slate-800 border-emerald-500 text-emerald-400 font-bold shadow-md"
-                  : "border-transparent text-slate-400 hover:bg-slate-850 hover:text-white hover:border-emerald-900"
-              }`}
-            >
-              <Activity className={`h-4 w-4 shrink-0 ${activeTab === "supervisor_dashboard" ? "text-emerald-400" : "text-slate-500"}`} />
-              <span className="flex-1">{language === "ar" ? "إشراف أرضي وتوجيه سريع" : "Supervisor Floor Dashboard"}</span>
-            </button>
-          )}
-
-          {(currentUser.role === "admin" || currentUser.role === "head_nurse" || currentUser.role === "supervisor" || currentUser.role === "quality") && (
-            <button
-              onClick={() => setActiveTab("headnurse_dashboard")}
-              className={`w-full flex items-center gap-3 px-6 py-3 text-right text-xs font-semibold transition-all border-l-4 ${
-                activeTab === "headnurse_dashboard"
-                  ? "bg-slate-800 border-pink-500 text-pink-400 font-bold shadow-md"
-                  : "border-transparent text-slate-400 hover:bg-slate-850 hover:text-white hover:border-pink-900"
-              }`}
-            >
-              <Users className={`h-4 w-4 shrink-0 ${activeTab === "headnurse_dashboard" ? "text-pink-400" : "text-slate-500"}`} />
-              <span className="flex-1">{language === "ar" ? "إدارة القسم والكارديكس" : "Head Nurse Ward Config"}</span>
-            </button>
-          )}
+          <button onClick={() => setActiveTab("his")} className={`w-full flex items-center gap-3 px-6 py-4 text-right text-xs font-semibold transition-all border-l-4 ${activeTab === "his" ? "bg-blue-900/40 border-blue-500 text-blue-400 font-bold shadow-md" : "border-transparent text-slate-400 hover:bg-slate-850 hover:text-white hover:border-blue-900"}`}>
+             <LayoutGrid className={`h-5 w-5 shrink-0 ${activeTab === "his" ? "text-blue-400" : "text-slate-500"} animate-pulse`} />
+             <span className="flex-1 text-[13px]">{language === "ar" ? "نظام إدارة المستشفى الشامل (HIS)" : "Complete HIS Modules Center"}</span>
+             <span className="bg-blue-600 text-white text-[8px] px-1.5 py-0.5 rounded-full font-bold">NEW</span>
+          </button>
 
           {/* 3. Analytics Hub */}
           {isSupervisor && (
@@ -8414,6 +8408,42 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
 
           {activeTab === "headnurse_dashboard" && (
             <HeadNurseDashboard language={language} />
+          )}
+
+          {activeTab === "his" && (
+            <HospitalInformationSystem language={language} />
+          )}
+
+          {activeTab === "reception" && (
+            <PatientRegistration language={language} />
+          )}
+
+          {activeTab === "emr" && (
+            <EMRDashboard language={language} />
+          )}
+
+          {activeTab === "ward" && (
+            <WardNurseDashboard language={language} />
+          )}
+
+          {activeTab === "ot" && (
+            <OperatingTheaterBoard language={language} />
+          )}
+
+          {activeTab === "pharmacy" && (
+            <PharmacyInventory language={language} />
+          )}
+
+          {activeTab === "billing" && (
+            <BillingInsurance language={language} />
+          )}
+
+          {activeTab === "ancillary" && (
+            <LISRISDashboard language={language} />
+          )}
+
+          {activeTab === "hospital_admin" && (
+            <SystemAdminPanel language={language} />
           )}
 
 {activeTab === "roster" && (() => {

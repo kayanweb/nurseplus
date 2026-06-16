@@ -69,19 +69,19 @@ export default function MealsDeliveryLog({ language, rosterList, departments }: 
   const componentRef = useRef<HTMLDivElement>(null);
 
   const handlePrint = useReactToPrint({
-    content: () => componentRef.current,
+    contentRef: componentRef,
     documentTitle: `Meals_List_${selectedDept}_${selectedDay}_${selectedMonth}`,
   });
 
   const batchComponentRef = useRef<HTMLDivElement>(null);
   const handlePrintAll = useReactToPrint({
-    content: () => batchComponentRef.current,
+    contentRef: batchComponentRef,
     documentTitle: `All_Depts_Meals_${selectedDay}_${selectedMonth}`,
   });
 
   const getMealStaffListForDept = (dept: string, type: "lunch" | "dinner") => {
-    const activeRoster = rosterList.find(r => r.departmentName === dept && (r as any).month === selectedMonth) 
-      || rosterList.find(r => r.departmentName === dept && !r.month && selectedMonth === "2026-05");
+    const activeRoster = rosterList.find((r: any) => r.departmentName === dept && r.month === selectedMonth) 
+      || rosterList.find((r: any) => r.departmentName === dept && !r.month && selectedMonth === "2026-05");
       
     if (!activeRoster) return [];
     
@@ -206,8 +206,8 @@ export default function MealsDeliveryLog({ language, rosterList, departments }: 
   };
 
   const handleSmartImport = () => {
-    const activeRoster = rosterList.find(r => r.departmentName === selectedDept && (r as any).month === selectedMonth) 
-      || rosterList.find(r => r.departmentName === selectedDept && !r.month && selectedMonth === "2026-05");
+    const activeRoster = rosterList.find((r: any) => r.departmentName === selectedDept && r.month === selectedMonth) 
+      || rosterList.find((r: any) => r.departmentName === selectedDept && !r.month && selectedMonth === "2026-05");
       
     if (!activeRoster) {
       alert(isAr ? "لا يوجد روستر لهذا القسم في هذا الشهر." : "No roster found for this department/month.");
@@ -618,12 +618,13 @@ export default function MealsDeliveryLog({ language, rosterList, departments }: 
                 const staff = getMealStaffListForDept(dept, type as any);
                 if (staff.length === 0) return null;
                 return (
-                  <PrintableMealPage 
-                    key={`${dept}-${type}`} 
-                    dept={dept} 
-                    type={type as any} 
-                    staffList={staff} 
-                  />
+                  <div key={`${dept}-${type}`}>
+                    <PrintableMealPage 
+                      dept={dept} 
+                      type={type as any} 
+                      staffList={staff} 
+                    />
+                  </div>
                 );
               })}
             </React.Fragment>

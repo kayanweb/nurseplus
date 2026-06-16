@@ -1032,6 +1032,61 @@ export async function deleteEmergencyTeam(id: string): Promise<void> {
   }
 }
 
+// 24. HIS Modules (Real-time)
+export function syncPatients(onData: (data: any[]) => void) {
+  const path = "baheya_his_patients";
+  return onSnapshot(
+    collection(db, path),
+    (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((doc) => list.push(doc.data()));
+      onData(list);
+    },
+    (error) => handleFirestoreError(error, OperationType.LIST, path)
+  );
+}
+export async function savePatient(patient: any): Promise<void> {
+  const path = `baheya_his_patients/${patient.id}`;
+  try { await setDoc(doc(db, "baheya_his_patients", patient.id), patient); }
+  catch (error) { handleFirestoreError(error, OperationType.WRITE, path); }
+}
+
+export function syncPrescriptions(onData: (data: any[]) => void) {
+  const path = "baheya_his_prescriptions";
+  return onSnapshot(
+    collection(db, path),
+    (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((doc) => list.push(doc.data()));
+      onData(list);
+    },
+    (error) => handleFirestoreError(error, OperationType.LIST, path)
+  );
+}
+export async function savePrescription(prescription: any): Promise<void> {
+  const path = `baheya_his_prescriptions/${prescription.id}`;
+  try { await setDoc(doc(db, "baheya_his_prescriptions", prescription.id), prescription); }
+  catch (error) { handleFirestoreError(error, OperationType.WRITE, path); }
+}
+
+export function syncInvoices(onData: (data: any[]) => void) {
+  const path = "baheya_his_invoices";
+  return onSnapshot(
+    collection(db, path),
+    (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((doc) => list.push(doc.data()));
+      onData(list);
+    },
+    (error) => handleFirestoreError(error, OperationType.LIST, path)
+  );
+}
+export async function saveInvoice(invoice: any): Promise<void> {
+  const path = `baheya_his_invoices/${invoice.id}`;
+  try { await setDoc(doc(db, "baheya_his_invoices", invoice.id), invoice); }
+  catch (error) { handleFirestoreError(error, OperationType.WRITE, path); }
+}
+
 
 
 

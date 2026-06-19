@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { Users, AlertCircle, RefreshCw, ClipboardCheck, BedDouble, ShieldAlert, Activity, GitMerge, FileText, Zap, ShieldCheck, PieChart, PenTool, ArrowRight } from "lucide-react";
+import { Users, AlertCircle, RefreshCw, ClipboardCheck, BedDouble, ShieldAlert, Activity, GitMerge, FileText, Zap, ShieldCheck, PieChart, PenTool, ArrowRight, Sparkles } from "lucide-react";
 import SupervisorRoundingAudit from "./SupervisorRoundingAudit";
+import SupervisorDailySuite from "./SupervisorDailySuite";
 import SmartNotificationCenter from "./SmartNotificationCenter";
 
 interface Props {
@@ -10,7 +11,7 @@ interface Props {
 export default function NursingSupervisorDashboard({ language }: Props) {
   const isAr = language === "ar";
   const [activeTab, setActiveTab] = useState<"reports" | "forms" | "interactive">("reports");
-  const [activeForm, setActiveForm] = useState<"none" | "rounding">("none");
+  const [activeForm, setActiveForm] = useState<"none" | "rounding" | "dailySuite">("none");
 
   return (
     <div className="p-4 md:p-6 bg-slate-50 min-h-screen text-right font-sans flex flex-col gap-6" dir={isAr ? "rtl" : "ltr"}>
@@ -167,7 +168,29 @@ export default function NursingSupervisorDashboard({ language }: Props) {
             )}
 
             {activeTab === "forms" && activeForm === "none" && (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 animate-fade-in">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-fade-in text-slate-800">
+                 {/* Brand New Real Supervisor Daily Suite Card */}
+                 <div className="bg-gradient-to-br from-pink-50 to-white p-5 rounded-2xl border-2 border-pink-200/80 shadow-md flex flex-col justify-between hover:shadow-lg transition hover:-translate-y-1 relative overflow-hidden group">
+                    <div className="absolute right-0 top-0 bg-pink-100 text-pink-700 font-extrabold text-[8px] font-mono px-2 py-0.5 rounded-bl uppercase">Official Form</div>
+                    <div className="mb-4">
+                      <div className="w-12 h-12 bg-pink-100 group-hover:bg-pink-200 text-pink-700 rounded-xl flex items-center justify-center mb-3 transition-colors">
+                        <Sparkles className="w-6 h-6 animate-pulse" />
+                      </div>
+                      <h4 className="font-extrabold text-sm text-slate-900 mb-1 flex items-center gap-1">
+                        {isAr ? "شيت مرور ومستندات السوبرفايزر اليومي" : "Daily Supervisor Rounding Suite"}
+                      </h4>
+                      <p className="text-[10px] text-slate-500 font-bold leading-relaxed">
+                        {isAr ? "شامل: ورقة توزيع المهام المعتمدة، تعداد طاقم التمريض، حراك المرضى والأسرة والتدقيق الكامل لعيادات بهية." : "Verified copies: Assignment worksheet, beds census, nursing team count and diagnostic unit logs."}
+                      </p>
+                    </div>
+                    <button 
+                      onClick={() => setActiveForm("dailySuite")}
+                      className="w-full bg-pink-600 hover:bg-pink-700 text-white text-xs font-black py-2 rounded-lg shadow-sm transition flex justify-center items-center gap-1 cursor-pointer"
+                    >
+                      {isAr ? "افتح المستندات والتقارير الأربعة" : "Open 4-Form Suite"} <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                 </div>
+
                  <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition hover:-translate-y-1">
                     <div className="mb-4">
                       <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center mb-3">
@@ -223,6 +246,13 @@ export default function NursingSupervisorDashboard({ language }: Props) {
                <div>
                   <button onClick={() => setActiveForm("none")} className="mb-4 text-xs font-bold text-slate-500 hover:text-slate-800 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">&larr; {isAr ? "العودة للنماذج" : "Back to Forms"}</button>
                   <SupervisorRoundingAudit language={language} isAr={isAr} />
+               </div>
+            )}
+
+            {activeTab === "forms" && activeForm === "dailySuite" && (
+               <div>
+                  <button onClick={() => setActiveForm("none")} className="mb-4 text-xs font-bold text-slate-500 hover:text-slate-800 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">&larr; {isAr ? "العودة للنماذج" : "Back to Forms"}</button>
+                  <SupervisorDailySuite language={language} />
                </div>
             )}
 

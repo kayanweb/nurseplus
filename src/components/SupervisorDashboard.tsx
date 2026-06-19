@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { 
   User, 
   ClipboardCheck, 
+  ClipboardList,
   FileText, 
   CheckSquare, 
   Search, 
@@ -27,6 +28,7 @@ import {
 } from "lucide-react";
 import { db } from "../firebase";
 import { AppUser } from "../types";
+import SupervisorDailySuite from "./SupervisorDailySuite";
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell
@@ -54,7 +56,7 @@ export default function SupervisorDashboard({
   saveEmergencyTeam
 }: SupervisorDashboardProps) {
   const isAr = language === "ar";
-  const [activeSubTab, setActiveSubTab] = useState<"duties" | "emergency" | "rounding" | "reports" | "approvals">("duties");
+  const [activeSubTab, setActiveSubTab] = useState<"duties" | "emergency" | "rounding" | "reports" | "approvals" | "dailySuite">("dailySuite");
   const [isOnline, setIsOnline] = useState(true);
   
   // Format today's date as YYYY-MM-DD
@@ -270,6 +272,7 @@ export default function SupervisorDashboard({
   };
 
   const tabs = [
+    { id: "dailySuite", icon: ClipboardList, labelAr: "السجل اليومي للمشرف (4 شيتات)", labelEn: "Supervisor Daily 4-Form Suite" },
     { id: "duties", icon: Sliders, labelAr: "توزيع مهام الأقسام", labelEn: "Ward Duties" },
     { id: "emergency", icon: ShieldAlert, labelAr: "فريق الطوارئ والكود بلو", labelEn: "Emergency (Code Blue)" },
     { id: "rounding", icon: ClipboardCheck, labelAr: "المرور والتفتيش", labelEn: "Daily Inspector Rounds" },
@@ -364,6 +367,24 @@ export default function SupervisorDashboard({
           );
         })}
       </div>
+
+      {/* ==================== SUB-TAB 0: DAILY INTEGRATED 4-FORM SUITE ==================== */}
+      {activeSubTab === "dailySuite" && (
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm animate-fade-in text-slate-800">
+          <div className="border-b border-slate-100 pb-4 mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="font-black text-slate-800 text-lg flex items-center gap-2">
+                <ClipboardList className="w-5 h-5 text-indigo-600" />
+                {isAr ? "سجل السوبرفايزر المالي والتشغيلي اليومي المعتمد" : "Approved Clinical Supervisor Daily Log & Census"}
+              </h3>
+              <p className="text-xs text-slate-500 font-semibold mt-1">
+                {isAr ? "قم بملء المستندات والجرودات التشغيلية لليوم بشكل كامل لدقة الجودة والاعتماد." : "Complete the comprehensive daily workforce checklists, bed counts and rounding observations."}
+              </p>
+            </div>
+          </div>
+          <SupervisorDailySuite language={language} />
+        </div>
+      )}
 
       {/* ==================== SUB-TAB 1: DEPARTMENT DUTY ALLOCATION ==================== */}
       {activeSubTab === "duties" && (

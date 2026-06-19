@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
-import { ClipboardCheck, CheckCircle2, XCircle, MinusCircle, Printer, Save, Archive, Play, Trash2, Download } from "lucide-react";
+import { ClipboardCheck, CheckCircle2, XCircle, MinusCircle, Printer, Save, Archive, Play, Trash2, Download, HeartPulse } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
+import { useSettings } from "../context/SettingsContext";
 
 interface RoundingAuditProps {
   language: "ar" | "en";
@@ -55,6 +56,7 @@ const CHECKLIST_TEMPLATE = [
 ];
 
 export default function SupervisorRoundingAudit({ language, isAr }: RoundingAuditProps) {
+  const { settings } = useSettings();
   const [viewState, setViewState] = useState<"start" | "active" | "archive">("start");
   
   const [currentRound, setCurrentRound] = useState<any>(null);
@@ -205,8 +207,13 @@ export default function SupervisorRoundingAudit({ language, isAr }: RoundingAudi
               <h1 className="text-2xl font-black text-slate-900 border-2 border-slate-900 inline-block px-6 py-2 rounded-lg mb-2">
                 {isAr ? "نموذج الجولات التفقدية الميدانية (Nursing Supervisor Rounding Form)" : "Nursing Supervisor Rounding Form"}
               </h1>
-              <div className="absolute top-0 right-0 print:block hidden">
-                 <img src="https://i.ibb.co/3s8Zq32/baheya.jpg" alt="Baheya Logo" className="h-16 w-auto object-contain grayscale" />
+              <div className="absolute top-0 right-0 flex items-center gap-1.5 border border-pink-200 bg-pink-50/25 px-2.5 py-1.5 rounded-lg">
+                <span className="font-mono font-black text-pink-700 text-[10px] tracking-wider border border-pink-300 px-1.5 py-0.5 rounded leading-none shrink-0">
+                  {settings.nameEn ? settings.nameEn.split(/\s+/).map((w: string) => w[0]).filter((c: string) => /^[a-zA-Z\u0600-\u06FF]$/.test(c)).slice(0, 2).join("").toUpperCase() : "BH"}
+                </span>
+                <span className="font-sans font-black text-slate-800 text-[10px] leading-none">
+                  {isAr ? (settings.institutionNameAr || "مؤسسة بهية") : (settings.institutionNameEn || "Baheya Foundation")}
+                </span>
               </div>
             </div>
 

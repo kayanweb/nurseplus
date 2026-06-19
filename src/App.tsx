@@ -114,6 +114,7 @@ import SystemAdminPanel from "./components/SystemAdminPanel";
 import HospitalInformationSystem from "./components/HospitalInformationSystem";
 import { FORM_TEMPLATES, createNewRecord, getItemsForTemplate } from "./data/templates";
 import { generatePDF } from "./lib/pdfGenerator";
+import { DynamicProfessionalLogo } from "./components/DynamicProfessionalLogo";
 import {
   testConnection,
   syncClinicalRecords,
@@ -4125,8 +4126,16 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
         <div className="w-full max-w-lg bg-white/90 backdrop-blur-xl p-8 rounded-3xl border border-white/50 shadow-2xl space-y-6 text-center animate-fade">
           {/* Branded Central Header */}
           <div className="flex flex-col items-center gap-2.5">
-            <div className="flex justify-center mb-1">
-               <Key className="w-12 h-12 text-slate-800" />
+            <div className="flex justify-center mb-1 select-none">
+              <DynamicProfessionalLogo 
+                nameAr={hospitalSettings.nameAr} 
+                nameEn={hospitalSettings.nameEn} 
+                taglineAr={hospitalSettings.taglineAr} 
+                taglineEn={hospitalSettings.taglineEn} 
+                size="xl" 
+                isAr={language === "ar"}
+                hideText={true} 
+              />
             </div>
             <div>
               <h1 className="text-4xl font-bold text-slate-800 tracking-tight flex items-center justify-center">
@@ -4365,8 +4374,8 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                       onChange={(e) => setSignupForm({ ...signupForm, department: e.target.value })}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-bold text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-pink-500"
                     >
-                      {departments.map((dept) => (
-                        <option key={dept} value={dept}>{dept}</option>
+                      {departments.map((dept, index) => (
+                        <option key={`${dept}-${index}`} value={dept}>{dept}</option>
                       ))}
                     </select>
                   </div>
@@ -4681,9 +4690,15 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
       <aside className="no-print w-full md:w-64 bg-slate-900 text-slate-100 flex flex-col border-b md:border-b-0 md:border-r border-slate-800 shrink-0 md:sticky md:top-0 md:h-screen md:overflow-y-auto">
         <div className="p-5 border-b border-slate-800">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-pink-600 rounded-lg flex items-center justify-center text-white font-bold shadow-lg ring-4 ring-pink-500/20">
-              BH
-            </div>
+            <DynamicProfessionalLogo 
+              nameAr={hospitalSettings.nameAr} 
+              nameEn={hospitalSettings.nameEn} 
+              taglineAr={hospitalSettings.taglineAr} 
+              taglineEn={hospitalSettings.taglineEn} 
+              size="sm" 
+              isAr={language === "ar"}
+              hideText={true} 
+            />
             <div>
               <h1 className="text-sm font-bold text-white font-sans">{language === "ar" ? hospitalSettings.portalTitleAr : hospitalSettings.portalTitleEn}</h1>
               <p className="text-[10px] text-slate-400 uppercase tracking-tighter">{language === "ar" ? hospitalSettings.premiumTitleAr : hospitalSettings.premiumTitleEn}</p>
@@ -5087,9 +5102,15 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
             className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition select-none group"
             title={language === "ar" ? "الرئيسية والمتابعة اليومية" : "Go to Dashboard Home"}
           >
-            <div className="w-10 h-10 bg-pink-600 group-hover:bg-pink-700 rounded-xl flex items-center justify-center text-white font-extrabold text-xs shadow-md shrink-0 transition-colors">
-              BHG
-            </div>
+            <DynamicProfessionalLogo 
+              nameAr={hospitalSettings.nameAr} 
+              nameEn={hospitalSettings.nameEn} 
+              taglineAr={hospitalSettings.taglineAr} 
+              taglineEn={hospitalSettings.taglineEn} 
+              size="md" 
+              isAr={language === "ar"}
+              hideText={true} 
+            />
             <div>
               <h2 className="text-sm md:text-base font-black text-slate-900 flex items-center gap-2 justify-end md:justify-start">
                 <HeartPulse className="h-4.5 w-4.5 text-pink-600 animate-pulse group-hover:scale-110 transition-transform" />
@@ -5585,7 +5606,7 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                      {departments.map((dept) => {
+                      {departments.map((dept, index) => {
                         const cl = dailyChecklists.find(c => c.department === dept && c.date === todayString);
                         
                         let cardColor = "border-slate-200 bg-slate-50 text-slate-700";
@@ -5609,7 +5630,7 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
 
                         return (
                           <div 
-                            key={dept} 
+                            key={`${dept}-${index}`} 
                             onClick={() => {
                               setSelectedDutyDept(dept);
                             }}
@@ -6716,25 +6737,14 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                       <div className="flex flex-col sm:flex-row items-center justify-between border-b-2 border-slate-900 pb-4 mb-4 avoid-break">
                         
                         {/* Bilingual Logo block */}
-                        <div className="flex items-center gap-3">
-                          <div className="text-right flex flex-col justify-center">
-                            <span className="text-xl sm:text-2xl font-black text-pink-600 tracking-tight leading-none">
-                              {hospitalSettings.nameAr}
-                            </span>
-                            <span className="text-[8px] text-pink-600 font-bold leading-tight select-none">
-                              {hospitalSettings.taglineAr}
-                            </span>
-                          </div>
-                          <div className="h-8 w-[1px] bg-slate-300 hidden sm:block"></div>
-                          <div className="text-left hidden sm:flex flex-col justify-center font-sans">
-                            <span className="text-xs font-extrabold text-slate-800 tracking-wide leading-none">
-                              {hospitalSettings.nameEn}
-                            </span>
-                            <span className="text-[8px] text-slate-400 leading-tight">
-                              {hospitalSettings.taglineEn}
-                            </span>
-                          </div>
-                        </div>
+                        <DynamicProfessionalLogo 
+                          nameAr={hospitalSettings.nameAr} 
+                          nameEn={hospitalSettings.nameEn} 
+                          taglineAr={hospitalSettings.taglineAr} 
+                          taglineEn={hospitalSettings.taglineEn} 
+                          size="print" 
+                          isAr={language === "ar"} 
+                        />
 
                         {/* Code blue form titles */}
                         <div className="text-center mt-3 sm:mt-0">
@@ -9281,8 +9291,8 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                       {isTabNormalNurse ? (
                         <option value={currentUser.department || "EMERGENCY UNIT"}>{currentUser.department || "EMERGENCY UNIT"}</option>
                       ) : (
-                        departments.map(dept => (
-                          <option key={dept} value={dept}>{dept}</option>
+                        departments.map((dept, index) => (
+                          <option key={`${dept}-${index}`} value={dept}>{dept}</option>
                         ))
                       )}
                     </select>
@@ -10704,8 +10714,8 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                           id="dist-dept-select"
                           className="w-full bg-slate-55 bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-semibold outline-none focus:ring-1 focus:ring-pink-500 text-slate-700 text-right"
                         >
-                          {departments.map(dept => (
-                            <option key={dept} value={dept} className="text-right">{dept}</option>
+                          {departments.map((dept, index) => (
+                            <option key={`${dept}-${index}`} value={dept} className="text-right">{dept}</option>
                           ))}
                         </select>
                       </div>
@@ -10778,8 +10788,8 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                           className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-semibold outline-none focus:ring-1 focus:ring-pink-500 text-slate-750 text-right font-sans"
                         >
                           <option value="ALL">{language === "ar" ? "كل أقسام المستشفى (بث عام)" : "All Hospital Departments"}</option>
-                          {departments.map(dept => (
-                            <option key={dept} value={dept}>{dept}</option>
+                          {departments.map((dept, index) => (
+                            <option key={`${dept}-${index}`} value={dept}>{dept}</option>
                           ))}
                         </select>
                       </div>
@@ -10875,7 +10885,7 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                         
                         return (
                           <div 
-                            key={dept} 
+                            key={`${dept}-${idx}`} 
                             className="bg-slate-50/60 p-4 rounded-xl border border-slate-150 shadow-xs hover:border-pink-300 hover:bg-slate-50 hover:shadow-sm transition flex flex-col justify-between"
                           >
                             <div className="text-right">
@@ -11934,8 +11944,8 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                               onChange={(e) => setEditTemplateForm({ ...editTemplateForm, departmentDefault: e.target.value })}
                               className="w-full bg-white border border-slate-200 rounded-lg py-1.5 px-3 font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-pink-500"
                             >
-                              {departments.map((d) => (
-                                <option key={d} value={d}>{d}</option>
+                              {departments.map((d, index) => (
+                                <option key={`${d}-${index}`} value={d}>{d}</option>
                               ))}
                             </select>
                           </div>
@@ -12161,8 +12171,8 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                           onChange={(e) => setTemplateForm({ ...templateForm, departmentDefault: e.target.value })}
                           className="w-full bg-white border border-slate-200 rounded-lg py-1.5 px-3 font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-pink-500 font-sans"
                         >
-                          {departments.map((d) => (
-                            <option key={d} value={d}>{d}</option>
+                          {departments.map((d, index) => (
+                            <option key={`${d}-${index}`} value={d}>{d}</option>
                           ))}
                         </select>
                       </div>
@@ -12451,8 +12461,8 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                               onChange={(e) => setNewUserForm({ ...newUserForm, department: e.target.value })}
                               className="w-full bg-white border border-slate-200 rounded-lg py-1.5 px-3 font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-pink-500"
                             >
-                              {departments.map((d) => (
-                                <option key={d} value={d}>{d}</option>
+                              {departments.map((d, index) => (
+                                <option key={`${d}-${index}`} value={d}>{d}</option>
                               ))}
                             </select>
                           </div>
@@ -12667,8 +12677,8 @@ For premium ease of use, you can click the visual override button 'Modify & Choo
                                   onChange={(e) => setEditUserForm({ ...editUserForm, department: e.target.value })}
                                   className="w-full bg-slate-50 border border-slate-200 rounded py-1 px-2 font-bold focus:bg-white focus:outline-none"
                                 >
-                                  {departments.map((d) => (
-                                    <option key={d} value={d}>{d}</option>
+                                  {departments.map((d, index) => (
+                                    <option key={`${d}-${index}`} value={d}>{d}</option>
                                   ))}
                                 </select>
                               </div>

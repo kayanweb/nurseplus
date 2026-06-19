@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { Pill, Package, ArrowRightLeft, FileSpreadsheet, CheckCircle2, AlertTriangle, ScanLine, Printer } from "lucide-react";
+import { useHIS } from "../context/HISContext";
+import { toast } from "sonner";
 
 interface Props {
   language: "ar" | "en";
@@ -8,6 +10,14 @@ interface Props {
 export default function PharmacyInventory({ language }: Props) {
   const isAr = language === "ar";
   const [activeTab, setActiveTab] = useState<"dispense" | "inventory" | "alerts">("dispense");
+
+  const { prescriptions, updatePrescriptionStatus, patients } = useHIS();
+  
+  const pendingRx = prescriptions.filter(rx => rx.status === "pending");
+  const [selectedRxId, setSelectedRxId] = useState<string | null>(null);
+  
+  const selectedRx = pendingRx.find(rx => rx.id === selectedRxId) || pendingRx[0];
+  const rxPatient = selectedRx ? patients.find(p => p.id === selectedRx.patientId) : null;
 
   return (
     <div className="p-4 md:p-6 bg-slate-50 min-h-screen font-sans text-right" dir={isAr ? "rtl" : "ltr"}>
@@ -46,12 +56,12 @@ export default function PharmacyInventory({ language }: Props) {
                     </h3>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                   {[1, 2, 3].map(idx => (
-                     <div key={idx} className={`border rounded-xl p-3 cursor-pointer transition ${idx === 1 ? 'bg-teal-50 border-teal-300 shadow-sm' : 'bg-white border-slate-200 hover:border-slate-300'}`}>
+                   {pendingRx.map(rx => (
+                     <div key={rx.id} onClick={() => setSelectedRxId(rx.id)} className={`border rounded-xl p-3 cursor-pointer transition ${selectedRx?.id === rx.id ? 'bg-teal-50 border-teal-300 shadow-sm' : 'bg-white border-slate-200 hover:border-slate-300'}`}>
                         <div className="flex justify-between items-start mb-2">
                            <div>
-                             <span className="font-bold text-slate-800 text-sm block">MRN-2026-0041</span>
-                             <span className="text-xs text-slate-500">Dr. Ahmed (Internal Med)</span>
+                             <span className="font-bold text-slate-800 text-sm block">{rx.mrn}</span>
+                             <span className="text-xs text-slate-500">{rx.doctorName}</span>
                            </div>
                            <span className="text-[10px] bg-amber-100 text-amber-700 font-bold px-1.5 py-0.5 rounded">
                               {isAr ? "جديد" : "Pending Review"}
@@ -59,6 +69,7 @@ export default function PharmacyInventory({ language }: Props) {
                         </div>
                      </div>
                    ))}
+                   {pendingRx.length === 0 && <p className="text-center text-sm text-slate-500 p-4">{isAr ? "لا توجد روشتات قيد الانتظار" : "No pending prescriptions"}</p>}
                 </div>
              </div>
 
@@ -72,12 +83,12 @@ export default function PharmacyInventory({ language }: Props) {
                 <div className="p-6 flex-1 space-y-6">
                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex justify-between items-center">
                       <div>
-                         <p className="font-bold text-slate-800">MRN: 2026-0041</p>
-                         <p className="text-sm text-slate-600">سمير عبدالله حافظ</p>
+                         <p className="font-bold text-slate-800">MRN: {selectedRx?.mrn || "N/A"}</p>
+                         <p className="text-sm text-slate-600">{rxPatient ? (isAr ? rxPatient.nameAr : rxPatient.nameEn) : "Unknown Patient"}</p>
                       </div>
                       <div className="text-right">
                          <p className="text-xs font-bold text-slate-500">{isAr ? "جهة التغطية" : "Payer"}</p>
-                         <p className="text-sm font-black text-indigo-700">{isAr ? "نقدي (Cash)" : "Cash Payment"}</p>
+                         <p className="text-sm font-black text-indigo-700">{rxPatient ? rxPatient.insurance : "Cash"}</p>
                       </div>
                    </div>
 
@@ -92,20 +103,17 @@ export default function PharmacyInventory({ language }: Props) {
                         </tr>
                       </thead>
                       <tbody>
-                        <tr className="border-b border-slate-100">
-                           <td className="py-4 px-2 font-bold text-slate-800">Glucophage 1000mg Tablet</td>
-                           <td className="py-4 px-2 text-xs">1 Tab BID</td>
-                           <td className="py-4 px-2 font-mono font-bold">60 Tabs</td>
-                           <td className="py-4 px-2 text-emerald-600 font-mono font-bold">450 Tabs</td>
-                           <td className="py-4 px-2 text-center text-emerald-500"><CheckCircle2 className="w-5 h-5 mx-auto" /></td>
-                        </tr>
-                        <tr className="border-b border-slate-100 bg-rose-50/30">
-                           <td className="py-4 px-2 font-bold text-slate-800">Amoxicillin 500mg Caps</td>
-                           <td className="py-4 px-2 text-xs">1 Cap TID</td>
-                           <td className="py-4 px-2 font-mono font-bold">21 Caps</td>
-                           <td className="py-4 px-2 font-mono font-bold text-rose-600">0 Caps <span className="text-[10px] bg-rose-100 text-rose-700 px-1 rounded ml-1">OUT OF STOCK</span></td>
-                           <td className="py-4 px-2 text-center text-rose-500"><AlertTriangle className="w-5 h-5 mx-auto" /></td>
-                        </tr>
+                        {selectedRx ? selectedRx.medications.map((med, idx) => (
+                           <tr key={idx} className="border-b border-slate-100">
+                              <td className="py-4 px-2 font-bold text-slate-800">{med.name}</td>
+                              <td className="py-4 px-2 text-xs">{med.dose} {med.freq}</td>
+                              <td className="py-4 px-2 font-mono font-bold">{med.duration}</td>
+                              <td className="py-4 px-2 text-emerald-600 font-mono font-bold">In Stock</td>
+                              <td className="py-4 px-2 text-center text-emerald-500"><CheckCircle2 className="w-5 h-5 mx-auto" /></td>
+                           </tr>
+                        )) : (
+                           <tr><td colSpan={5} className="py-4 text-center text-slate-500 text-sm">Select a prescription from the queue</td></tr>
+                        )}
                       </tbody>
                    </table>
 
@@ -118,7 +126,7 @@ export default function PharmacyInventory({ language }: Props) {
                 </div>
                 <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-between">
                    <button className="text-slate-500 font-bold text-sm hover:text-slate-800">{isAr ? "تعديل الروشتة بالاتصال بالطبيب" : "Request Rx Change"}</button>
-                   <button className="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2.5 px-6 rounded-xl shadow-sm transition flex items-center gap-2">
+                   <button disabled={!selectedRx} onClick={async () => { if (!selectedRx) return; await updatePrescriptionStatus(selectedRx.id, "dispensed"); toast.success(isAr ? "تم صرف الروشتة بنجاح!" : "Dispensed successfully!"); }} className="bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-bold py-2.5 px-6 rounded-xl shadow-sm transition flex items-center gap-2">
                       <Printer className="w-4 h-4"/> {isAr ? "طباعة الباركود وتسعير الفاتورة" : "Print Labels & Bill Patient"}
                    </button>
                 </div>

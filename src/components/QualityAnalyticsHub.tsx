@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { AppUser, SavedRecord } from "../types";
 import { useFirestoreSync } from "../hooks/useFirestoreSync";
+import { DynamicProfessionalLogo } from "./DynamicProfessionalLogo";
 
 // Import Cloud-Safe functions from firestore service
 import {
@@ -3140,17 +3141,14 @@ export default function QualityAnalyticsHub({
                           <p>STATUS: VERIFIED & COMPLIANT</p>
                         </div>
                         
-                        <div className="text-right">
-                          <h4 className="font-black text-xs text-slate-900 uppercase tracking-widest font-mono">
-                            {(hospitalSettings?.nameEn || "BAHEYA HOSPITAL").toUpperCase()} HEALTHCARE FOUNDATION
-                          </h4>
-                          <p className="font-extrabold text-[12px] text-slate-700 mt-1">
-                            {hospitalSettings?.nameAr || "مستشفيات مؤسسة بهية الكشف المبكر"} / إدارة الجودة والتحسين المستمر للأداء
-                          </p>
-                          <p className="text-[10px] text-slate-400 mt-0.5">
-                            الوثيقة الرسمية للأرشيف الاعتمادي والرقابة الصحية الكلية للمنشآت الطبية
-                          </p>
-                        </div>
+                        <DynamicProfessionalLogo 
+                          nameAr={hospitalSettings?.nameAr} 
+                          nameEn={hospitalSettings?.nameEn} 
+                          taglineAr="إدارة الجودة والتحسين المستمر للأداء" 
+                          taglineEn="Quality Improvement & Performance Department" 
+                          size="print" 
+                          isAr={true} 
+                        />
                       </div>
 
                       {/* Seal Verification Block */}

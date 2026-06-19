@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import { DepartmentRoster } from "../types";
-import { Printer, Calendar, Coffee, Moon, Search, Plus, Save, Archive, Download, Trash2, Edit2 } from "lucide-react";
+import { Printer, Calendar, Coffee, Moon, Search, Plus, Save, Archive, Download, Trash2, Edit2, HeartPulse } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
+import { useSettings } from "../context/SettingsContext";
 
 interface MealsDeliveryLogProps {
   language: "ar" | "en";
@@ -11,6 +12,7 @@ interface MealsDeliveryLogProps {
 
 export default function MealsDeliveryLog({ language, rosterList, departments }: MealsDeliveryLogProps) {
   const isAr = language === "ar";
+  const { settings } = useSettings();
   
   // States
   const [selectedDept, setSelectedDept] = useState<string>(departments?.[0] || "");
@@ -114,8 +116,20 @@ export default function MealsDeliveryLog({ language, rosterList, departments }: 
           <div className="text-center flex-1 pt-6 text-right">
             <h2 className="text-3xl font-black text-slate-900 mb-1">{isAr ? "جدول تسليم وجبات الموظفين" : "Employee Meal Delivery Log"}</h2>
           </div>
-          <div className="flex flex-col">
-            <img src="https://i.ibb.co/3s8Zq32/baheya.jpg" alt="Baheya Logo" className="h-[80px] w-auto object-contain print:h-[90px]" />
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            <div className="flex items-center gap-1.5 border border-pink-200 bg-pink-50/25 px-3 py-1.5 rounded-xl">
+              <span className="font-mono font-black text-pink-700 text-xs tracking-wider border border-pink-300 px-1 py-0.5 rounded leading-none shrink-0">
+                {settings.nameEn ? settings.nameEn.split(/\s+/).map((w: string) => w[0]).filter((c: string) => /^[a-zA-Z\u0600-\u06FF]$/.test(c)).slice(0, 2).join("").toUpperCase() : "BH"}
+              </span>
+              <div className="text-right">
+                <span className="font-sans font-black text-slate-800 text-xs block leading-none">
+                  {isAr ? (settings.institutionNameAr || "مؤسسة بهية") : (settings.institutionNameEn || "Baheya Foundation")}
+                </span>
+                <span className="text-[8px] font-bold text-pink-700 block mt-1 tracking-wider leading-none">
+                  {isAr ? "نظام تغذية الكادر" : "NURSE MEAL LOG"}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -469,8 +483,20 @@ export default function MealsDeliveryLog({ language, rosterList, departments }: 
               <div className="text-center flex-1 pt-6 text-right">
                 <h2 className="text-3xl font-black text-slate-900 mb-1">{isAr ? "جدول تسليم وجبات الموظفين" : "Employee Meal Delivery Log"}</h2>
               </div>
-              <div className="flex flex-col">
-                <img src="https://i.ibb.co/3s8Zq32/baheya.jpg" alt="Baheya Logo" className="h-[80px] w-auto object-contain print:h-[90px]" />
+              <div className="flex flex-col items-end gap-1 shrink-0">
+                <div className="flex items-center gap-1.5 border border-pink-200 bg-pink-50/25 px-3 py-1.5 rounded-xl">
+                  <span className="font-mono font-black text-pink-700 text-xs tracking-wider border border-pink-300 px-1 py-0.5 rounded leading-none shrink-0">
+                    {settings.nameEn ? settings.nameEn.split(/\s+/).map((w: string) => w[0]).filter((c: string) => /^[a-zA-Z\u0600-\u06FF]$/.test(c)).slice(0, 2).join("").toUpperCase() : "BH"}
+                  </span>
+                  <div className="text-right">
+                    <span className="font-sans font-black text-slate-800 text-xs block leading-none">
+                      {isAr ? (settings.institutionNameAr || "مؤسسة بهية") : (settings.institutionNameEn || "Baheya Foundation")}
+                    </span>
+                    <span className="text-[8px] font-bold text-pink-700 block mt-1 tracking-wider leading-none">
+                      {isAr ? "نظام تغذية الكادر" : "NURSE MEAL LOG"}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
 

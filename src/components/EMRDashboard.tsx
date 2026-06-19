@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { Activity, Stethoscope, ClipboardList, Thermometer, User, AlertTriangle, FileSignature, Save, Pill, TestTube, ArrowRight } from "lucide-react";
+import { useHIS } from "../context/HISContext";
+import { toast } from "sonner";
 
 interface Props {
   language: "ar" | "en";
@@ -9,6 +11,13 @@ export default function EMRDashboard({ language }: Props) {
   const isAr = language === "ar";
   const [activeRoleTab, setActiveRoleTab] = useState<"triage" | "emr">("triage");
   const [emrSubTab, setEmrSubTab] = useState<"subjective" | "objective" | "assessment" | "plan">("subjective");
+  
+  const { patients, updatePatientStatus, addPrescription } = useHIS();
+  const triagePatients = patients.filter(p => p.status === "registered" || p.status === "triage");
+  const doctorPatients = patients.filter(p => p.status === "doctor");
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
+  
+  const selectedPatient = patients.find(p => p.id === selectedPatientId) || triagePatients[0] || doctorPatients[0];
 
   const vitalsFormInputs = [
     { label: isAr ? "ضغط الدم الانقباضي (Systolic)" : "Systolic BP", unit: "mmHg", id: "sys" },
@@ -57,20 +66,21 @@ export default function EMRDashboard({ language }: Props) {
                     </h3>
                  </div>
                  <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                    {[1, 2, 3, 4, 5].map((item, idx) => (
-                      <div key={item} className={`border rounded-xl p-3 cursor-pointer transition ${idx === 0 ? 'bg-emerald-50 border-emerald-300 shadow-sm' : 'bg-white border-slate-200 hover:border-slate-300'}`}>
+                    {triagePatients.map((patient, idx) => (
+                      <div key={patient.id} onClick={() => setSelectedPatientId(patient.id)} className={`border rounded-xl p-3 cursor-pointer transition ${selectedPatient?.id === patient.id ? 'bg-emerald-50 border-emerald-300 shadow-sm' : 'bg-white border-slate-200 hover:border-slate-300'}`}>
                          <div className="flex justify-between items-start mb-2">
-                            <span className="font-bold text-slate-800 text-sm">سمير عبدالله حافظ</span>
-                            <span className="font-mono text-[10px] font-bold text-slate-500 bg-slate-100 px-1 rounded">MRN-2026-004{item}</span>
+                            <span className="font-bold text-slate-800 text-sm">{isAr ? patient.nameAr : patient.nameEn}</span>
+                            <span className="font-mono text-[10px] font-bold text-slate-500 bg-slate-100 px-1 rounded">{patient.mrn}</span>
                          </div>
                          <div className="flex justify-between items-center text-xs">
-                            <span className="text-slate-500">Queue: #{10 + item}</span>
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${idx === 0 ? 'bg-emerald-200 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                               {idx === 0 ? (isAr ? "قيد الفرز الآن" : "In Triage") : (isAr ? "في الانتظار" : "Waiting")}
+                            <span className="text-slate-500">Queue: #{10 + idx}</span>
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${patient.status === 'triage' ? 'bg-emerald-200 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                               {patient.status === 'triage' ? (isAr ? "قيد الفرز الآن" : "In Triage") : (isAr ? "في الانتظار" : "Waiting")}
                             </span>
                          </div>
                       </div>
                     ))}
+                    {triagePatients.length === 0 && <p className="text-center text-sm text-slate-500 p-4">{isAr ? "لا يوجد مرضى في الانتظار" : "No patients in waiting queue"}</p>}
                  </div>
               </div>
 
@@ -104,11 +114,14 @@ export default function EMRDashboard({ language }: Props) {
                        </div>
                     </div>
                  </div>
-                 <div className="p-4 border-t border-slate-100 mt-auto flex justify-end">
-                    <button className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-6 rounded-xl shadow-sm transition flex items-center gap-2">
-                       <Save className="w-4 h-4"/> {isAr ? "حفظ وتمرير للطبيب" : "Save & Send to Doctor"}
-                    </button>
-                 </div>
+                     <div className="p-4 border-t border-slate-100 mt-auto flex justify-end">
+                        <button 
+                           disabled={!selectedPatient}
+                           onClick={() => selectedPatient && updatePatientStatus(selectedPatient.id, "doctor")} 
+                           className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold py-2.5 px-6 rounded-xl shadow-sm transition flex items-center gap-2">
+                           <Save className="w-4 h-4"/> {isAr ? "حفظ وتمرير للطبيب" : "Save & Send to Doctor"}
+                        </button>
+                     </div>
               </div>
            </div>
         )}
@@ -119,15 +132,17 @@ export default function EMRDashboard({ language }: Props) {
              {/* Patient Context Header */}
              <div className="bg-slate-800 text-white p-4 flex flex-col md:flex-row justify-between items-center gap-4">
                 <div className="flex items-center gap-4">
-                   <div className="w-12 h-12 bg-slate-700 rounded-full flex items-center justify-center font-black text-xl">س</div>
+                   <div className="w-12 h-12 bg-slate-700 rounded-full flex items-center justify-center font-black text-xl">{selectedPatient ? selectedPatient.nameAr.charAt(0) : "؟"}</div>
                    <div>
-                      <h2 className="font-black text-lg">سمير عبدالله حافظ <span className="text-xs font-normal text-slate-400 bg-slate-900 px-2 py-0.5 rounded ml-2 font-mono">MRN: 2026-0041</span></h2>
-                      <p className="text-xs text-slate-300 mt-1">45 Y • Male • {isAr ? "نقدي" : "Cash Patient"}</p>
+                      <h2 className="font-black text-lg">{selectedPatient ? (isAr ? selectedPatient.nameAr : selectedPatient.nameEn) : "No Patient Selected"} <span className="text-xs font-normal text-slate-400 bg-slate-900 px-2 py-0.5 rounded ml-2 font-mono">MRN: {selectedPatient?.mrn || "N/A"}</span></h2>
+                      <p className="text-xs text-slate-300 mt-1">{selectedPatient?.age || 0} Y • {selectedPatient?.gender || "Unknown"} • {selectedPatient ? (isAr ? selectedPatient.insurance : selectedPatient.insurance) : ""}</p>
                    </div>
                 </div>
-                <div className="bg-rose-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg border border-rose-400 flex items-center gap-2 animate-pulse">
-                   <AlertTriangle className="w-4 h-4" /> {isAr ? "تنبيه: حساسية بنسلين شديدة" : "ALERT: Severe Penicillin Allergy"}
-                </div>
+                {selectedPatient && (
+                  <div className="bg-rose-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg border border-rose-400 flex items-center gap-2 animate-pulse">
+                     <AlertTriangle className="w-4 h-4" /> {isAr ? "تنبيه: لا يوجد حساسيات مسجلة" : "ALERT: No allergies recorded"}
+                  </div>
+                )}
              </div>
 
              {/* EMR Tabs */}
@@ -261,7 +276,22 @@ export default function EMRDashboard({ language }: Props) {
              {/* EMR Sticky Footer Actions */}
              <div className="bg-slate-50 border-t border-slate-200 p-4 flex justify-between items-center">
                 <button className="text-slate-500 text-xs font-bold hover:text-slate-700">{isAr ? "تأجيل الحفظ" : "Save as Draft"}</button>
-                <button className="bg-slate-900 hover:bg-black text-white font-bold py-2.5 px-8 rounded-xl shadow-md transition flex items-center gap-2">
+                <button 
+                  disabled={!selectedPatient}
+                  onClick={async () => {
+                     if (!selectedPatient) return;
+                     await addPrescription({ 
+                        id: "rx" + Date.now(), 
+                        patientId: selectedPatient.id, 
+                        mrn: selectedPatient.mrn,
+                        doctorName: "Dr. Smith", // Mock
+                        medications: [{ name: "Glucophage 1000mg Tablet", dose: "1 Tablet", freq: "BID", duration: "30 Days" }],
+                        status: "pending" 
+                     });
+                     await updatePatientStatus(selectedPatient.id, "pharmacy");
+                     toast.success(isAr ? "تم إرسال الروشتة وتوجيه المريض للصيدلية" : "Prescription sent to Pharmacy successfully.");
+                  }}
+                  className="bg-slate-900 hover:bg-black disabled:opacity-50 text-white font-bold py-2.5 px-8 rounded-xl shadow-md transition flex items-center gap-2">
                    <FileSignature className="w-4 h-4" /> {isAr ? "توقيع وإغلاق الزيارة (Sign & Close)" : "Sign & Lock Visit"}
                 </button>
              </div>

@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { Users, Calendar, Activity, CreditCard, UserPlus, Search, BedDouble, ArrowRightLeft, Clock, CheckCircle2, ShieldAlert, LogOut } from "lucide-react";
+import { useHIS, Patient } from "../context/HISContext";
+import { toast } from "sonner";
 
 interface Props {
   language: "ar" | "en";
@@ -8,6 +10,44 @@ interface Props {
 export default function PatientRegistration({ language }: Props) {
   const isAr = language === "ar";
   const [activeSubTab, setActiveSubTab] = useState<"register" | "appointments" | "adt" | "discharge">("register");
+  
+  const { patients, addPatient, updatePatientStatus } = useHIS();
+  
+  // Registration Form State
+  const [firstName, setFirstName] = useState("");
+  const [fatherName, setFatherName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [insurance, setInsurance] = useState("Cash");
+  const [gender, setGender] = useState("male");
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleRegister = async () => {
+    if (!firstName || !phone) {
+      return toast.error(isAr ? "يرجى تعبئة الحقول المطلوبة (الاسم، الهاتف)" : "Please fill required fields (Name, Phone)");
+    }
+    setIsSaving(true);
+    const newId = "p" + Date.now();
+    const newMrn = "MRN-2026-" + Math.floor(1000 + Math.random() * 9000);
+    const fullName = fatherName ? `${firstName} ${fatherName}` : firstName;
+    
+    await addPatient({
+      id: newId,
+      mrn: newMrn,
+      nameEn: fullName,
+      nameAr: fullName, // simple fallback
+      age: 30, // mock
+      gender: gender,
+      phone: phone,
+      status: "registered",
+      insurance: insurance
+    });
+    
+    setFirstName("");
+    setFatherName("");
+    setPhone("");
+    setIsSaving(false);
+    toast.success(isAr ? `تم حفظ المريض بنجاح! : ${newMrn}` : `Patient registered successfully! MRN: ${newMrn}`);
+  };
 
   return (
     <div className="p-4 md:p-6 bg-slate-50 min-h-screen font-sans text-right" dir={isAr ? "rtl" : "ltr"}>
@@ -55,8 +95,8 @@ export default function PatientRegistration({ language }: Props) {
                   <div className="lg:col-span-3">
                     <label className="text-[10px] text-slate-500 font-bold block mb-1">{isAr ? "الاسم رباعي" : "Full Name (4 Parts)"}</label>
                     <div className="grid grid-cols-4 gap-2">
-                      <input type="text" placeholder={isAr ? "الاسم الأول" : "First Name"} className="w-full bg-white border border-slate-300 focus:border-blue-500 rounded-lg p-2.5 text-xs outline-none" />
-                      <input type="text" placeholder={isAr ? "اسم الأب" : "Father Name"} className="w-full bg-white border border-slate-300 focus:border-blue-500 rounded-lg p-2.5 text-xs outline-none" />
+                      <input type="text" value={firstName} onChange={e => setFirstName(e.target.value)} placeholder={isAr ? "الاسم الأول" : "First Name"} className="w-full bg-white border border-slate-300 focus:border-blue-500 rounded-lg p-2.5 text-xs outline-none" />
+                      <input type="text" value={fatherName} onChange={e => setFatherName(e.target.value)} placeholder={isAr ? "اسم الأب" : "Father Name"} className="w-full bg-white border border-slate-300 focus:border-blue-500 rounded-lg p-2.5 text-xs outline-none" />
                       <input type="text" placeholder={isAr ? "اسم الجد" : "Grandfather"} className="w-full bg-white border border-slate-300 focus:border-blue-500 rounded-lg p-2.5 text-xs outline-none" />
                       <input type="text" placeholder={isAr ? "اسم العائلة" : "Family Name"} className="w-full bg-white border border-slate-300 focus:border-blue-500 rounded-lg p-2.5 text-xs outline-none" />
                     </div>
@@ -77,9 +117,9 @@ export default function PatientRegistration({ language }: Props) {
                   </div>
                   <div>
                     <label className="text-[10px] text-slate-500 font-bold block mb-1">{isAr ? "الجنس" : "Gender"}</label>
-                    <select className="w-full bg-white border border-slate-300 focus:border-blue-500 rounded-lg p-2.5 text-xs outline-none">
-                      <option>{isAr ? "ذكر" : "Male"}</option>
-                      <option>{isAr ? "أنثى" : "Female"}</option>
+                    <select value={gender} onChange={e => setGender(e.target.value)} className="w-full bg-white border border-slate-300 focus:border-blue-500 rounded-lg p-2.5 text-xs outline-none">
+                      <option value="male">{isAr ? "ذكر" : "Male"}</option>
+                      <option value="female">{isAr ? "أنثى" : "Female"}</option>
                     </select>
                   </div>
                   <div>
@@ -99,7 +139,7 @@ export default function PatientRegistration({ language }: Props) {
                   </div>
                   <div>
                     <label className="text-[10px] text-slate-500 font-bold block mb-1">{isAr ? "رقم المحمول الأساسي" : "Mobile Number"}</label>
-                    <input type="tel" placeholder="01X-XXXX-XXXX" className="w-full bg-white border border-slate-300 focus:border-blue-500 rounded-lg p-2.5 text-xs outline-none" />
+                    <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="01X-XXXX-XXXX" className="w-full bg-white border border-slate-300 focus:border-blue-500 rounded-lg p-2.5 text-xs outline-none" />
                   </div>
                   <div>
                     <label className="text-[10px] text-slate-500 font-bold block mb-1">{isAr ? "رقم طوارئ (Emergency Contact)" : "Emergency Contact"}</label>
@@ -112,11 +152,11 @@ export default function PatientRegistration({ language }: Props) {
                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                      <div>
                        <label className="text-[10px] text-slate-500 font-bold block mb-1">{isAr ? "نوع التغطية" : "Coverage Type"}</label>
-                       <select className="w-full bg-white border border-slate-300 focus:border-blue-500 rounded-lg p-2.5 text-xs outline-none">
-                         <option>{isAr ? "نقدي (Cash)" : "Cash"}</option>
-                         <option>{isAr ? "شركة تأمين طبية" : "Private Insurance"}</option>
-                         <option>{isAr ? "نفقة الدولة" : "Govt. Coverage"}</option>
-                         <option>{isAr ? "تعاقد شركات" : "Corporate"}</option>
+                       <select value={insurance} onChange={e => setInsurance(e.target.value)} className="w-full bg-white border border-slate-300 focus:border-blue-500 rounded-lg p-2.5 text-xs outline-none">
+                         <option value="Cash">{isAr ? "نقدي (Cash)" : "Cash"}</option>
+                         <option value="Private Insurance">{isAr ? "شركة تأمين طبية" : "Private Insurance"}</option>
+                         <option value="Govt. Coverage">{isAr ? "نفقة الدولة" : "Govt. Coverage"}</option>
+                         <option value="Corporate">{isAr ? "تعاقد شركات" : "Corporate"}</option>
                        </select>
                      </div>
                      <div className="opacity-50 pointer-events-none">
@@ -133,7 +173,9 @@ export default function PatientRegistration({ language }: Props) {
                 </div>
 
                 <div className="flex justify-end pt-4">
-                  <button className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-xl shadow-md transition">{isAr ? "حفظ واستخراج كارت المريض" : "Save & Generate MRN Profile"}</button>
+                  <button onClick={handleRegister} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-xl shadow-md transition disabled:opacity-50">
+                    {isSaving ? "Saving..." : (isAr ? "حفظ واستخراج كارت المريض" : "Save & Generate MRN Profile")}
+                  </button>
                 </div>
              </div>
           </div>
